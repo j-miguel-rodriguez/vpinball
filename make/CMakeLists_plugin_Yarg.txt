@@ -1,0 +1,91 @@
+# plugin CMake file to be included in main project CMakelists
+#
+# --- YARG + VPX integration plugin ---
+#
+# This file, VPinballLib.cpp's 3-line registration patch (see its own
+# comment), and this whole directory's existence are the project's
+# documented "last resort" exception to its own "don't fork VPX" rule
+# (see ~/.../vpx-yarg/CLAUDE.md and docs/ios-platform-plan.md): iOS has
+# no dynamic plugin loading at all (Apple's code-signing model), so a
+# static registration entry here is the only way to get the plugin into
+# the app. Everything else -- the plugin's actual C++ source, the
+# NativeAOT-compiled YARG.Core engine, build scripts -- lives entirely
+# outside this checkout, in the separate `vpx-yarg` project.
+#
+# Only BUILD_STATIC is implemented here (unlike the other
+# CMakeLists_plugin_*.txt files' dual shared/static branches): this
+# fork exists for iOS only, which is always BUILD_STATIC (see
+# CMakeLists_plugins.txt). The Linux .so build already has its own,
+# fully separate CMake project (yarg-vpx-plugin/CMakeLists.txt in the
+# vpx-yarg repo) and deployment path -- reproducing a BUILD_SHARED
+# branch here would be unused dead code, not a real second platform.
+#
+# Assumes the sibling-checkout layout this project actually uses, both
+# locally and in CI (see vpx-yarg's docs/04-ios-step1.md): this fork
+# lives at <vpx-yarg-root>/external/vpinball-ios, so two levels up from
+# CMAKE_SOURCE_DIR is <vpx-yarg-root>.
+set(VPX_YARG_ROOT "${CMAKE_SOURCE_DIR}/../..")
+set(YARG_PLUGIN_SOURCE_DIR "${VPX_YARG_ROOT}/yarg-vpx-plugin")
+
+set(YARG_PLUGIN_SOURCES
+   "${YARG_PLUGIN_SOURCE_DIR}/YargVpxPlugin.cpp"
+   "${YARG_PLUGIN_SOURCE_DIR}/NativeEngine.cpp"
+   "${YARG_PLUGIN_SOURCE_DIR}/AudioClock.cpp"
+   "${YARG_PLUGIN_SOURCE_DIR}/Highway.cpp"
+)
+
+if(BUILD_STATIC)
+   add_compile_options(-fPIC)
+
+   add_library(YargPlugin STATIC ${YARG_PLUGIN_SOURCES})
+
+   set_target_properties(YargPlugin PROPERTIES
+      PREFIX ""
+      OUTPUT_NAME "plugin-yarg"
+   )
+
+   target_include_directories(YargPlugin PUBLIC
+      ${CMAKE_SOURCE_DIR}/plugins
+      ${CMAKE_SOURCE_DIR}/third-party/include/miniaudio
+   )
+
+   # NativeEngine.cpp's iOS branch (docs/06-ios-step3.md in vpx-yarg):
+   # calls yarg_* directly instead of dlopen/dlsym, since there's no
+   # separate engine library file to load once everything is statically
+   # linked into this one app binary.
+   target_compile_definitions(YargPlugin PRIVATE YARG_STATIC_LINK_NATIVE_ENGINE)
+
+   # yargcore-native-ios.a: step 2's own artifact (vpx-yarg's
+   # docs/05-ios-step2.md), published via `dotnet publish -r ios-arm64`
+   # in yargcore-native-ios/. Must exist before this configure step --
+   # CI runs that publish first, in the same job/checkout.
+   file(GLOB YARGCORE_NATIVE_IOS_A
+      "${VPX_YARG_ROOT}/yargcore-native-ios/bin/Release/net10.0/ios-arm64/publish/yargcore-native-ios.a")
+   if(NOT YARGCORE_NATIVE_IOS_A)
+      message(WARNING "YargPlugin: yargcore-native-ios.a not found under "
+         "${VPX_YARG_ROOT}/yargcore-native-ios/bin/ -- run "
+         "`dotnet publish -r ios-arm64` there first, or the final app "
+         "link will fail with undefined yarg_* symbols.")
+   endif()
+
+   # The NativeAOT iOS runtime pack's own native PAL support libraries
+   # (System.Native, the crypto/compression/GSSAPI PALs, the GC, etc.) --
+   # NativeLib=Static only emits our own managed code, not these. Found
+   # the same way vpx-yarg's own CI does (docs/06-ios-step3.md): glob the
+   # project's NuGet cache (nuget.config in the vpx-yarg repo redirects it
+   # to .nuget-packages there) rather than guess exact package/version
+   # paths.
+   file(GLOB_RECURSE YARG_IOS_PAL_LIBS
+      "${VPX_YARG_ROOT}/.nuget-packages/microsoft.netcore.app.runtime.nativeaot.ios-arm64/*/runtimes/ios-arm64/native/*.a")
+
+   target_link_libraries(YargPlugin PUBLIC
+      ${YARGCORE_NATIVE_IOS_A}
+      ${YARG_IOS_PAL_LIBS}
+      -framework Foundation
+      -framework Network
+      -framework Security
+      -framework CoreFoundation
+      -framework GSS
+      z
+   )
+endif()

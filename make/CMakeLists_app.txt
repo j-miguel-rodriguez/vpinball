@@ -827,6 +827,7 @@ elseif(PLATFORM STREQUAL "ios" OR PLATFORM STREQUAL "ios-simulator" OR PLATFORM 
       VNIPlugin
       WMPPlugin
       UpscaleDMDPlugin
+      YargPlugin
       $<$<BOOL:${ENABLE_XR}>:openxr_loader>
    )
 

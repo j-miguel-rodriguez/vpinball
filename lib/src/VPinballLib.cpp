@@ -59,6 +59,12 @@ MSGPI_EXPORT void MSGPIAPI WMPPluginLoad(const uint32_t sessionId, const MsgPlug
 MSGPI_EXPORT void MSGPIAPI WMPPluginUnload();
 MSGPI_EXPORT void MSGPIAPI VNIPluginLoad(const uint32_t sessionId, const MsgPluginAPI* api);
 MSGPI_EXPORT void MSGPIAPI VNIPluginUnload();
+// YARG + VPX integration project -- see ../../../../yarg-vpx-plugin/YargVpxPlugin.cpp.
+// Minimal, documented patch per that project's own "don't fork VPX, last
+// resort only" rule: iOS has no dynamic plugin loading at all, so a
+// static registration entry here is the only way to get it into the app.
+MSGPI_EXPORT void MSGPIAPI YargPluginLoad(const uint32_t sessionId, const MsgPluginAPI* api);
+MSGPI_EXPORT void MSGPIAPI YargPluginUnload();
 
 
 namespace VPinballLib {
@@ -337,7 +343,8 @@ void VPinballLib::SetupStaticPlugins(MsgPI::MsgPluginManager& manager)
       { "Serum",         &SerumPluginLoad,         &SerumPluginUnload         },
       { "WMP",           &WMPPluginLoad,           &WMPPluginUnload           },
       { "UpscaleDMD",    &UpscaleDMDPluginLoad,    &UpscaleDMDPluginUnload    },
-      { "VNI",           &VNIPluginLoad,           &VNIPluginUnload           }
+      { "VNI",           &VNIPluginLoad,           &VNIPluginUnload           },
+      { "Yarg",          &YargPluginLoad,          &YargPluginUnload          }
    };
 
    for (size_t i = 0; i < std::size(plugins); ++i) {
