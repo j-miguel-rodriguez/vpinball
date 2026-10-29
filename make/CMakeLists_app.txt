@@ -863,6 +863,17 @@ elseif(PLATFORM STREQUAL "ios" OR PLATFORM STREQUAL "ios-simulator" OR PLATFORM 
          "-framework ImageIO"
          "-framework UIKit"
          "-framework CoreBluetooth"
+         # YARG + VPX integration project: needed by YargPlugin's own
+         # NativeAOT iOS runtime pack dependencies. Listed directly here,
+         # not via YargPlugin's own target_link_libraries, because
+         # propagating -framework flags transitively through a static
+         # library's PUBLIC interface into this link breaks apart the
+         # "-framework X" token pair -- see CMakeLists_plugin_Yarg.txt's
+         # own comment for the real ld error this caused.
+         "-framework CoreFoundation"
+         "-framework Network"
+         "-framework Security"
+         "-framework GSS"
       )
    elseif(PLATFORM STREQUAL "android")
       target_link_libraries(vpinball PUBLIC

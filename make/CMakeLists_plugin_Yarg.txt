@@ -105,14 +105,21 @@ if(BUILD_STATIC)
    file(GLOB_RECURSE YARG_IOS_PAL_LIBS
       "${VPX_YARG_ROOT}/.nuget-packages/microsoft.netcore.app.runtime.nativeaot.ios-arm64/*/runtimes/ios-arm64/native/*.a")
 
+   # Only real .a file paths here, deliberately -- not -framework flags.
+   # First attempt put -framework Foundation/Network/Security/
+   # CoreFoundation/GSS here too (PUBLIC), which produced a real,
+   # confirmed ld bug: propagating a multi-token "-framework X" pair
+   # transitively through a static library's PUBLIC interface into the
+   # final libvpinball.dylib link splits the pair apart, leaving a bare
+   # "Security" etc. that ld then tries to resolve as a plain library
+   # ("ld: library 'Security' not found") instead of a framework. Moved
+   # those frameworks into CMakeLists_app.txt's own existing ios
+   # framework list instead (directly on the app target, same place
+   # Foundation/AVFAudio/etc. already live, matching the established
+   # pattern) -- see that file's own comment. `z` is already in the
+   # app's own non-platform-specific link list; not duplicated here.
    target_link_libraries(YargPlugin PUBLIC
       ${YARGCORE_NATIVE_IOS_A}
       ${YARG_IOS_PAL_LIBS}
-      -framework Foundation
-      -framework Network
-      -framework Security
-      -framework CoreFoundation
-      -framework GSS
-      z
    )
 endif()
