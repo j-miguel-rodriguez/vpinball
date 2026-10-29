@@ -53,7 +53,16 @@ if(BUILD_STATIC)
    # calls yarg_* directly instead of dlopen/dlsym, since there's no
    # separate engine library file to load once everything is statically
    # linked into this one app binary.
-   target_compile_definitions(YargPlugin PRIVATE YARG_STATIC_LINK_NATIVE_ENGINE)
+   # YargVpxPlugin.cpp's PSC_CLASS_START/PSC_PROP_R/PSC_CLASS_END,
+   # UnsubscribeMsg, and SubmitTypeLibrary usage all need this fork's
+   # own, newer vpinball API shapes (see that file's own
+   # YARG_NEW_VPX_PLUGIN_API comment and docs/07-ios-step4.md) -- this
+   # fork is genuinely ahead of the Linux checkout the plugin was first
+   # written against, confirmed directly against both real headers.
+   target_compile_definitions(YargPlugin PRIVATE
+      YARG_STATIC_LINK_NATIVE_ENGINE
+      YARG_NEW_VPX_PLUGIN_API
+   )
 
    # yargcore-native-ios.a: step 2's own artifact (vpx-yarg's
    # docs/05-ios-step2.md), published via `dotnet publish -r ios-arm64`
