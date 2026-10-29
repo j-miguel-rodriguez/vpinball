@@ -37,6 +37,21 @@ set(YARG_PLUGIN_SOURCES
 if(BUILD_STATIC)
    add_compile_options(-fPIC)
 
+   # AudioClock.cpp includes miniaudio.h, which on iOS internally pulls in
+   # AVFoundation.h (its AVAudioEngine-based backend) -- confirmed directly
+   # from a real failed build: Foundation's own Objective-C headers
+   # (NSObjCRuntime.h etc.) don't parse under plain C++ ("unknown type
+   # name 'NSString'", "expected unqualified-id"). Force this one source
+   # file to compile as Objective-C++ instead, same as how the app's own
+   # apps/macos/main.mm already does for its own Apple-framework usage --
+   # OBJCXX is already a working language in this project's build, no new
+   # enable_language() needed. The shared .cpp file itself is untouched;
+   # this is purely a build-mode override, isolated to the iOS plugin
+   # target.
+   set_source_files_properties("${YARG_PLUGIN_SOURCE_DIR}/AudioClock.cpp" PROPERTIES
+      LANGUAGE OBJCXX
+   )
+
    add_library(YargPlugin STATIC ${YARG_PLUGIN_SOURCES})
 
    set_target_properties(YargPlugin PROPERTIES
