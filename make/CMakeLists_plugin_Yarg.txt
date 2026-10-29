@@ -43,11 +43,14 @@ if(BUILD_STATIC)
    # (NSObjCRuntime.h etc.) don't parse under plain C++ ("unknown type
    # name 'NSString'", "expected unqualified-id"). Force this one source
    # file to compile as Objective-C++ instead, same as how the app's own
-   # apps/macos/main.mm already does for its own Apple-framework usage --
-   # OBJCXX is already a working language in this project's build, no new
-   # enable_language() needed. The shared .cpp file itself is untouched;
-   # this is purely a build-mode override, isolated to the iOS plugin
-   # target.
+   # apps/macos/main.mm does for its own Apple-framework usage. OBJCXX
+   # turned out NOT to already be enabled for this "ios" platform
+   # configuration specifically (confirmed by a real "language OBJCXX was
+   # requested but was not enabled" CMake configure error) -- main.mm must
+   # go through some other, separate CMake path. enable_language() here is
+   # idempotent if it's later enabled elsewhere too.
+   enable_language(OBJCXX)
+
    set_source_files_properties("${YARG_PLUGIN_SOURCE_DIR}/AudioClock.cpp" PROPERTIES
       LANGUAGE OBJCXX
    )
