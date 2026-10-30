@@ -77,9 +77,15 @@ if(BUILD_STATIC)
    # YARG_NEW_VPX_PLUGIN_API comment and docs/07-ios-step4.md) -- this
    # fork is genuinely ahead of the Linux checkout the plugin was first
    # written against, confirmed directly against both real headers.
+   # YARG_DIAGNOSTIC_SKIP_NATIVE_ENGINE_INIT: TEMPORARY, see
+   # YargVpxPlugin.cpp's own comment on it and docs/08-ios-step5.md.
+   # Isolates whether NativeEngine/yarg_create()'s real execution is
+   # what aborts the app on real iOS hardware. Remove this line once
+   # that question is answered either way.
    target_compile_definitions(YargPlugin PRIVATE
       YARG_STATIC_LINK_NATIVE_ENGINE
       YARG_NEW_VPX_PLUGIN_API
+      YARG_DIAGNOSTIC_SKIP_NATIVE_ENGINE_INIT
    )
 
    # yargcore-native-ios.a: step 2's own artifact (vpx-yarg's
