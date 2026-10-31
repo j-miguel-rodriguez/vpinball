@@ -953,6 +953,13 @@ void Player::InitTableSession(const bool isInitial)
          { OnScriptError(type, line, column, description, stackDump); });
       m_scriptInterpreter->Start(m_ptable);
       m_scriptInterpreter->Evaluate(m_pluginAPI.ApplyScriptCOMObjectOverrides(m_ptable->m_script_text), false);
+      // TEMPORARY diagnostic (vpx-yarg's docs/09-ios-flipper-input.md):
+      // second checkpoint alongside ScriptInterpreter.cpp's own -- confirms
+      // from the Player's own perspective whether the script engine is
+      // actually live after Start()+Evaluate(), since every downstream
+      // FireDispID() call (right below, and every KeyDown/KeyUp) silently
+      // no-ops with zero indication if it isn't.
+      PLOGI << "YARG diagnostic: script interpreter HasError()=" << m_scriptInterpreter->HasError();
 
       // Fire Init event for table object itself and all table parts, also fire Animate event of parts having it, since initial setup is considered as the initial animation event
       m_ptable->FireVoidEvent(DISPID_GameEvents_Init);

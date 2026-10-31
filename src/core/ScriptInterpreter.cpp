@@ -29,8 +29,15 @@ ScriptInterpreter::ScriptInterpreter()
    // could be called directly here to avoid any dependency on import library symbol ordering.
    // VBScript (and the debug manager below) only exist as in-process servers, so no handler or local server fallback
    const HRESULT vbScriptResult = CoCreateInstance(CLSID_VBScript, 0, CLSCTX_INPROC_SERVER, IID_IActiveScriptParse, (LPVOID *)&m_pScriptParse);
+   // TEMPORARY diagnostic (vpx-yarg's docs/09-ios-flipper-input.md): this
+   // failure path is normally completely silent -- every FireDispID call
+   // (table Init, KeyDown/KeyUp, etc.) then becomes an unlogged no-op with
+   // no indication anywhere that the script engine never came up at all.
    if (vbScriptResult != S_OK)
+   {
+      PLOGE << "YARG diagnostic: CoCreateInstance(CLSID_VBScript) failed, HRESULT=0x" << std::hex << vbScriptResult << std::dec;
       return;
+   }
 
 #ifdef VPX_HAS_SCRIPT_DEBUGGER
    // This can fail on some systems (I tested with wine 6.9 and this fails)
