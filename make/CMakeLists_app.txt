@@ -875,6 +875,27 @@ elseif(PLATFORM STREQUAL "ios" OR PLATFORM STREQUAL "ios-simulator" OR PLATFORM 
          "-framework Security"
          "-framework GSS"
       )
+
+      # libwinevbs (the vendored VBScript engine -- see platforms/ios-arm64/
+      # external.sh, linked above via plain `winevbs` in target_link_libraries)
+      # is a static archive with no CMake IMPORTED target, so it's resolved
+      # as an ordinary `-lwinevbs`. Apple's linker only pulls object files
+      # from a static archive that something else directly references a
+      # symbol from; libwinevbs's CLSID_VBScript self-registration is reached
+      # only indirectly (COM-style CoCreateInstance lookup, not a direct
+      # call), so nothing forces the linker to include it. Confirmed real
+      # symptom on-device: flippers and the plunger key (100% script-driven,
+      # via Table_KeyDown/KeyUp -> Flipper::RotateToEnd/Start) go completely
+      # inert with no error or log line at all (ScriptInterpreter.cpp's own
+      # CoCreateInstance failure path is silent by design), while nudge
+      # (has a native physics-impulse fallback) and menu navigation (handled
+      # natively, never touches script) keep working -- exactly consistent
+      # with the script engine silently failing to instantiate. `-force_load`
+      # is the standard fix for this exact static-archive-member-selection
+      # problem on Apple platforms.
+      target_link_options(vpinball PUBLIC
+         "-Wl,-force_load,${BUILD_LIBS_DIR}/libwinevbs.a"
+      )
    elseif(PLATFORM STREQUAL "android")
       target_link_libraries(vpinball PUBLIC
          android
