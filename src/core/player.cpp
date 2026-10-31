@@ -151,8 +151,13 @@ Player::Player(PinTable *const table, const PlayMode playMode, LoadProgress &loa
       if (auto existing = Settings::GetRegistry().GetPropertyId("Plugin." + plugin->m_id, "Enable"s); existing.has_value())
          enableId = existing.value();
       else
+         // YARG default-on (vpx-yarg project): Yarg ships as a required part of
+         // this fork, not an optional plugin a user opts into via the ini --
+         // default it enabled so a fresh install/factory-reset/version bump
+         // doesn't silently disable it again. Every other plugin keeps the
+         // original default (false).
          enableId = Settings::GetRegistry().Register(
-            std::make_unique<VPX::Properties::BoolPropertyDef>("Plugin." + plugin->m_id, "Enable"s, "Enable"s, "Enable/Disable plugin '" + plugin->m_name + '\'', true, false));
+            std::make_unique<VPX::Properties::BoolPropertyDef>("Plugin." + plugin->m_id, "Enable"s, "Enable"s, "Enable/Disable plugin '" + plugin->m_name + '\'', true, plugin->m_id == "Yarg"s));
       if (m_ptable->GetSettings().GetBool(enableId))
       {
          plugin->Load(&m_pluginManager.GetMsgAPI());
