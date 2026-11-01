@@ -865,6 +865,38 @@ class TableManager {
             TableFileOperations.listTableURLs(tempDir)
         }.value
 
+        if tableURLs.isEmpty {
+            // Some clients (e.g. the GitHub app's download/share-sheet
+            // handling) don't know .vpz's real UTI and rename a perfectly
+            // valid single-table pack to .zip on save, which otherwise
+            // makes it look like an empty "archive" to the nested-table
+            // scan above (it's looking for a .vpx/.vpz FILE inside, not a
+            // pack's own directory contents). Reuses the same
+            // manifest.json check extractPack/packRoot already use for a
+            // correctly-extensioned .vpz import.
+            let root = Self.packRoot(tempDir)
+            if TableFileOperations.exists(root.appendingPathComponent("manifest.json")) {
+                let tableName = url.deletingPathExtension().lastPathComponent
+                let folderName = getUniqueFolder(baseName: tableName)
+                let destFolder = tablesURL.appendingPathComponent(folderName)
+                let destPackDir = destFolder.appendingPathComponent(tableName + ".vpz")
+
+                let copied = await Task.detached(priority: .userInitiated) {
+                    if !TableFileOperations.createDirectory(destFolder) {
+                        return false
+                    }
+                    return TableFileOperations.copyDirectory(from: root, to: destPackDir)
+                }.value
+
+                if !copied {
+                    _ = TableFileOperations.deleteDirectory(destFolder)
+                    MainViewModel.shared.handleShowError(message: "Failed to import table")
+                    return nil
+                }
+                return destPackDir
+            }
+        }
+
         if tableURLs.count != 1 {
             MainViewModel.shared.handleShowError(message: tableURLs.isEmpty
                 ? "No tables found in archive"
