@@ -876,7 +876,16 @@ class TableManager {
             // correctly-extensioned .vpz import.
             let root = Self.packRoot(tempDir)
             if TableFileOperations.exists(root.appendingPathComponent("manifest.json")) {
-                let tableName = url.deletingPathExtension().lastPathComponent
+                // Some clients append rather than replace the extension
+                // (e.g. "yarg-demo-ios.vpz" -> "yarg-demo-ios.vpz.zip"), so
+                // a single deletingPathExtension() would leave ".vpz" baked
+                // into the name -- strip a second recognized extension if
+                // one remains.
+                var nameURL = url.deletingPathExtension()
+                if ["vpz", "vpx", "zip", "vpxz"].contains(nameURL.pathExtension.lowercased()) {
+                    nameURL = nameURL.deletingPathExtension()
+                }
+                let tableName = nameURL.lastPathComponent
                 let folderName = getUniqueFolder(baseName: tableName)
                 let destFolder = tablesURL.appendingPathComponent(folderName)
                 let destPackDir = destFolder.appendingPathComponent(tableName + ".vpz")
