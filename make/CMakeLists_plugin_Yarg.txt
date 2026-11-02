@@ -33,6 +33,7 @@ set(YARG_PLUGIN_SOURCES
    "${YARG_PLUGIN_SOURCE_DIR}/AudioClock.cpp"
    "${YARG_PLUGIN_SOURCE_DIR}/Highway.cpp"
    "${YARG_PLUGIN_SOURCE_DIR}/iOSChartPath.mm"
+   "${YARG_PLUGIN_SOURCE_DIR}/iOSGuitarDiagnostic.mm"
 )
 
 if(BUILD_STATIC)
@@ -63,6 +64,13 @@ if(BUILD_STATIC)
    # match AudioClock.cpp's own explicit precedent above rather than
    # rely on the implicit default.
    set_source_files_properties("${YARG_PLUGIN_SOURCE_DIR}/iOSChartPath.mm" PROPERTIES
+      LANGUAGE OBJCXX
+   )
+
+   # iOSGuitarDiagnostic.mm (docs/guitar-input-recon.md, Phase 1):
+   # TEMPORARY GameController-layer diagnostic logging. Same .mm
+   # default-detection note as iOSChartPath.mm above.
+   set_source_files_properties("${YARG_PLUGIN_SOURCE_DIR}/iOSGuitarDiagnostic.mm" PROPERTIES
       LANGUAGE OBJCXX
    )
 

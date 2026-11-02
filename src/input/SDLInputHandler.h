@@ -96,10 +96,20 @@ public:
       case SDL_EVENT_JOYSTICK_REMOVED: OnJoystickRemoved(e.jdevice.which); break;
 
       case SDL_EVENT_JOYSTICK_BUTTON_DOWN:
-      case SDL_EVENT_JOYSTICK_BUTTON_UP: m_pininput.PushButtonEvent(m_joystickIds[e.jbutton.which], e.jbutton.button, e.jbutton.timestamp, e.jbutton.down); break;
+      case SDL_EVENT_JOYSTICK_BUTTON_UP:
+         // TEMPORARY diagnostic (vpx-yarg's docs/guitar-input-recon.md,
+         // Phase 1): per-event SDL joystick logging, to see exactly what
+         // the guitar reports. Remove once the mapping is known.
+         PLOGI << "YARG: [guitar diagnostic] SDL joystick button: which=" << e.jbutton.which << " button=" << static_cast<int>(e.jbutton.button)
+               << " down=" << e.jbutton.down << " ts=" << e.jbutton.timestamp;
+         m_pininput.PushButtonEvent(m_joystickIds[e.jbutton.which], e.jbutton.button, e.jbutton.timestamp, e.jbutton.down);
+         break;
 
       case SDL_EVENT_JOYSTICK_HAT_MOTION:
       {
+         // TEMPORARY diagnostic, same as above.
+         PLOGI << "YARG: [guitar diagnostic] SDL joystick hat: which=" << e.jhat.which << " hat=" << static_cast<int>(e.jhat.hat) << " value=" << static_cast<int>(e.jhat.value)
+               << " ts=" << e.jhat.timestamp;
          const uint16_t hatId = e.jhat.hat * 4;
          m_pininput.PushButtonEvent(m_joystickIds[e.jhat.which], 0x0100 | hatId, e.jhat.timestamp, (e.jhat.value & SDL_HAT_LEFT) != 0);
          m_pininput.PushButtonEvent(m_joystickIds[e.jhat.which], 0x0101 | hatId, e.jhat.timestamp, (e.jhat.value & SDL_HAT_RIGHT) != 0);
@@ -108,7 +118,12 @@ public:
          break;
       }
 
-      case SDL_EVENT_JOYSTICK_AXIS_MOTION: m_pininput.PushAxisEvent(m_joystickIds[e.jaxis.which], 0x0200 | e.jaxis.axis, e.jaxis.timestamp, static_cast<float>(e.jaxis.value) / 32768.f); break;
+      case SDL_EVENT_JOYSTICK_AXIS_MOTION:
+         // TEMPORARY diagnostic, same as above.
+         PLOGI << "YARG: [guitar diagnostic] SDL joystick axis: which=" << e.jaxis.which << " axis=" << static_cast<int>(e.jaxis.axis) << " value=" << e.jaxis.value
+               << " ts=" << e.jaxis.timestamp;
+         m_pininput.PushAxisEvent(m_joystickIds[e.jaxis.which], 0x0200 | e.jaxis.axis, e.jaxis.timestamp, static_cast<float>(e.jaxis.value) / 32768.f);
+         break;
 
       case SDL_EVENT_FINGER_DOWN:
       case SDL_EVENT_FINGER_UP:
