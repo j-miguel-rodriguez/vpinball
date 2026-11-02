@@ -32,6 +32,7 @@ set(YARG_PLUGIN_SOURCES
    "${YARG_PLUGIN_SOURCE_DIR}/NativeEngine.cpp"
    "${YARG_PLUGIN_SOURCE_DIR}/AudioClock.cpp"
    "${YARG_PLUGIN_SOURCE_DIR}/Highway.cpp"
+   "${YARG_PLUGIN_SOURCE_DIR}/iOSChartPath.mm"
 )
 
 if(BUILD_STATIC)
@@ -52,6 +53,16 @@ if(BUILD_STATIC)
    enable_language(OBJCXX)
 
    set_source_files_properties("${YARG_PLUGIN_SOURCE_DIR}/AudioClock.cpp" PROPERTIES
+      LANGUAGE OBJCXX
+   )
+
+   # iOSChartPath.mm (docs/11-ios-native-engine-crash.md): plain Apple
+   # Foundation/NSBundle usage to resolve the test chart's real on-device
+   # path. .mm is CMake's own default-detected Objective-C++ extension,
+   # so this explicit property is strictly redundant -- set anyway to
+   # match AudioClock.cpp's own explicit precedent above rather than
+   # rely on the implicit default.
+   set_source_files_properties("${YARG_PLUGIN_SOURCE_DIR}/iOSChartPath.mm" PROPERTIES
       LANGUAGE OBJCXX
    )
 
