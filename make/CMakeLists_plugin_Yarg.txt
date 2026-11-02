@@ -34,6 +34,7 @@ set(YARG_PLUGIN_SOURCES
    "${YARG_PLUGIN_SOURCE_DIR}/Highway.cpp"
    "${YARG_PLUGIN_SOURCE_DIR}/iOSChartPath.mm"
    "${YARG_PLUGIN_SOURCE_DIR}/iOSGuitarDiagnostic.mm"
+   "${YARG_PLUGIN_SOURCE_DIR}/iOSMidiInput.mm"
 )
 
 if(BUILD_STATIC)
@@ -71,6 +72,13 @@ if(BUILD_STATIC)
    # TEMPORARY GameController-layer diagnostic logging. Same .mm
    # default-detection note as iOSChartPath.mm above.
    set_source_files_properties("${YARG_PLUGIN_SOURCE_DIR}/iOSGuitarDiagnostic.mm" PROPERTIES
+      LANGUAGE OBJCXX
+   )
+
+   # iOSMidiInput.mm (docs/midi-input-recon.md): CoreMIDI-based note
+   # input, permanent (not a temporary diagnostic like the two above).
+   # Same .mm default-detection note as iOSChartPath.mm above.
+   set_source_files_properties("${YARG_PLUGIN_SOURCE_DIR}/iOSMidiInput.mm" PROPERTIES
       LANGUAGE OBJCXX
    )
 
