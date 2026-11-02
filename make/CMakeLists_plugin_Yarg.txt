@@ -68,9 +68,12 @@ if(BUILD_STATIC)
    )
 
    # NativeEngine.cpp's iOS branch (docs/06-ios-step3.md in vpx-yarg):
-   # calls yarg_* directly instead of dlopen/dlsym, since there's no
-   # separate engine library file to load once everything is statically
-   # linked into this one app binary.
+   # calls yarg_* directly (build-time linked against the dylib below,
+   # resolved by dyld at launch) instead of dlopen/dlsym -- the macro
+   # name (YARG_STATIC_LINK_NATIVE_ENGINE) predates the switch away from
+   # a statically-archived .a (docs/11-ios-native-engine-crash.md) and
+   # really just means "direct-linked" now, not "static", but a global
+   # rename wasn't worth the multi-file churn.
    # YargVpxPlugin.cpp's PSC_CLASS_START/PSC_PROP_R/PSC_CLASS_END,
    # UnsubscribeMsg, and SubmitTypeLibrary usage all need this fork's
    # own, newer vpinball API shapes (see that file's own
@@ -82,44 +85,41 @@ if(BUILD_STATIC)
       YARG_NEW_VPX_PLUGIN_API
    )
 
-   # yargcore-native-ios.a: step 2's own artifact (vpx-yarg's
+   # yargcore-native-ios.dylib: step 2's own artifact (vpx-yarg's
    # docs/05-ios-step2.md), published via `dotnet publish -r ios-arm64`
-   # in yargcore-native-ios/. Must exist before this configure step --
-   # CI runs that publish first, in the same job/checkout.
-   file(GLOB YARGCORE_NATIVE_IOS_A
-      "${VPX_YARG_ROOT}/yargcore-native-ios/bin/Release/net10.0/ios-arm64/publish/yargcore-native-ios.a")
-   if(NOT YARGCORE_NATIVE_IOS_A)
-      message(WARNING "YargPlugin: yargcore-native-ios.a not found under "
+   # in yargcore-native-ios/, then had its install name rewritten to
+   # @rpath/yargcore-native-ios.dylib by vpx-yarg's own CI step (must
+   # happen before this configure step, so this dylib's own recorded -id
+   # -- what libvpinball.dylib's build-time link below bakes in as its
+   # dependency reference -- is already the correct runtime-relative
+   # path, not a build-machine absolute path). Self-contained (SDK's
+   # SelfContained=true): unlike the old NativeLib=Static output, this
+   # single file already has the NativeAOT runtime pack's PAL support
+   # libraries (System.Native, crypto/compression/GSSAPI, GC, etc.)
+   # linked in, so no separate PAL .a glob is needed here anymore (see
+   # docs/11-ios-native-engine-crash.md for why NativeLib=Static was
+   # dropped in the first place -- its own real limitation, not a build
+   # mechanics issue: Microsoft's own docs say static libraries aren't
+   # officially supported for Native AOT, and that's what crashed
+   # yarg_create() silently on real hardware).
+   file(GLOB YARGCORE_NATIVE_IOS_DYLIB
+      "${VPX_YARG_ROOT}/yargcore-native-ios/bin/Release/net10.0/ios-arm64/publish/yargcore-native-ios.dylib")
+   if(NOT YARGCORE_NATIVE_IOS_DYLIB)
+      message(WARNING "YargPlugin: yargcore-native-ios.dylib not found under "
          "${VPX_YARG_ROOT}/yargcore-native-ios/bin/ -- run "
          "`dotnet publish -r ios-arm64` there first, or the final app "
          "link will fail with undefined yarg_* symbols.")
    endif()
 
-   # The NativeAOT iOS runtime pack's own native PAL support libraries
-   # (System.Native, the crypto/compression/GSSAPI PALs, the GC, etc.) --
-   # NativeLib=Static only emits our own managed code, not these. Found
-   # the same way vpx-yarg's own CI does (docs/06-ios-step3.md): glob the
-   # project's NuGet cache (nuget.config in the vpx-yarg repo redirects it
-   # to .nuget-packages there) rather than guess exact package/version
-   # paths.
-   file(GLOB_RECURSE YARG_IOS_PAL_LIBS
-      "${VPX_YARG_ROOT}/.nuget-packages/microsoft.netcore.app.runtime.nativeaot.ios-arm64/*/runtimes/ios-arm64/native/*.a")
-
-   # Only real .a file paths here, deliberately -- not -framework flags.
-   # First attempt put -framework Foundation/Network/Security/
-   # CoreFoundation/GSS here too (PUBLIC), which produced a real,
-   # confirmed ld bug: propagating a multi-token "-framework X" pair
-   # transitively through a static library's PUBLIC interface into the
-   # final libvpinball.dylib link splits the pair apart, leaving a bare
-   # "Security" etc. that ld then tries to resolve as a plain library
-   # ("ld: library 'Security' not found") instead of a framework. Moved
-   # those frameworks into CMakeLists_app.txt's own existing ios
-   # framework list instead (directly on the app target, same place
-   # Foundation/AVFAudio/etc. already live, matching the established
-   # pattern) -- see that file's own comment. `z` is already in the
-   # app's own non-platform-specific link list; not duplicated here.
+   # Linking directly against the dylib's path (not a -framework flag) is
+   # enough for the linker to resolve yarg_* symbols; actually getting
+   # the dylib embedded into the shipped app bundle (so it's there for
+   # dyld to load at runtime) is handled separately, by the Xcode
+   # project's own existing "Embed Frameworks" run-script build phase
+   # (apps/ios/VPinball.xcodeproj), which now also copies this dylib
+   # alongside VPinballFramework.framework -- see that script's own
+   # comment.
    target_link_libraries(YargPlugin PUBLIC
-      ${YARGCORE_NATIVE_IOS_A}
-      ${YARG_IOS_PAL_LIBS}
+      ${YARGCORE_NATIVE_IOS_DYLIB}
    )
 endif()
