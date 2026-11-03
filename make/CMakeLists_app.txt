@@ -861,6 +861,9 @@ elseif(PLATFORM STREQUAL "ios" OR PLATFORM STREQUAL "ios-simulator" OR PLATFORM 
          # that comment's own explanation of the -framework
          # transitive-propagation bug this avoids).
          "-framework CoreMIDI"
+         # CABTMIDICentralViewController, for the Bluetooth MIDI connect
+         # picker (same reasoning as CoreMIDI just above).
+         "-framework CoreAudioKit"
          "-framework AudioToolbox"
          "-framework CoreAudio"
          "-framework CoreHaptics"
