@@ -3547,7 +3547,19 @@ void Renderer::Render3DScene()
    {
       if (m_yargBallReflectionCleanRT == nullptr)
          m_yargBallReflectionCleanRT = renderedRT->Duplicate("YargBallReflectionClean"s, false);
+      // BlitRenderTarget asserts the destination is already the active render
+      // pass's target (RenderDevice.cpp's own assert(m_currentPass->m_rt ==
+      // destination), needed for correct render-pass-dependency sorting) --
+      // same SetRenderTarget-before/-after dance as the MSAA resolve above,
+      // which this was supposed to mirror from the start. Missing it meant
+      // the copy silently landed in the wrong pass in a Release build (no
+      // assert to catch it), so this never actually produced a clean
+      // snapshot -- confirmed as the reason the fix showed no difference.
+      RenderPass* const initial_rt = m_renderDevice->GetCurrentPass();
+      m_renderDevice->SetRenderTarget("YargBallReflectionClean"s, m_yargBallReflectionCleanRT);
       m_renderDevice->BlitRenderTarget(renderedRT, m_yargBallReflectionCleanRT, true, false);
+      m_renderDevice->SetRenderTarget(initial_rt->m_name, initial_rt->m_rt);
+      initial_rt->m_name += '-';
    }
 #endif
 
