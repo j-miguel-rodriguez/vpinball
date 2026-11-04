@@ -3560,6 +3560,14 @@ void Renderer::Render3DScene()
       m_renderDevice->BlitRenderTarget(renderedRT, m_yargBallReflectionCleanRT, true, false);
       m_renderDevice->SetRenderTarget(initial_rt->m_name, initial_rt->m_rt);
       initial_rt->m_name += '-';
+      // SetRenderTarget() above only wires the new (restored) pass's
+      // dependency back to renderedRT's PREVIOUS writer (initial_rt) --
+      // nothing automatically chains it to the blit pass we just ran, since
+      // they're siblings off that same ancestor, not a direct edge. Without
+      // this, the pass sorter is free to schedule the ancillary-window
+      // writes below either before or after our blit, silently reproducing
+      // the exact bug this is meant to fix. Force the explicit order.
+      m_renderDevice->AddRenderTargetDependency(m_yargBallReflectionCleanRT);
    }
 #endif
 
