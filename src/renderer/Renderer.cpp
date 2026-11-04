@@ -3573,7 +3573,33 @@ void Renderer::Render3DScene()
 
    // Clear embedded ancillary windows before updarting bloom & AO
    ClearEmbeddedAncillaryWindow(VPXWindowId::VPXWINDOW_Backglass, g_pplayer->m_backglassOutput, renderedRT);
+#ifndef YARG_DISABLE_SCOREVIEW_CLEAR_SKIP
+   // YARG + VPX integration: this is the REAL fix for the ball
+   // disappearing under the highway -- ClearEmbeddedAncillaryWindow()
+   // unconditionally paints a fully OPAQUE black quad
+   // (DrawEmbeddedQuad(..., 0.f, 0.f, 0.f), alpha hardcoded to 1.f in
+   // the shader call) over the ENTIRE ScoreView rectangle before any
+   // ancillary content (our highway) gets drawn into it -- confirmed
+   // on-device: the ball/playfield only ever showed through the part
+   // of its sprite that extended PAST the rectangle's edges, never
+   // through the highway's own (correctly alpha-blended)
+   // HighwayOpacity setting, no matter its value, because by the time
+   // our own draw runs the ball underneath is already erased. VPX's
+   // ancillary-window mechanism assumes a solid scoreboard/DMD panel,
+   // not a see-through overlay over live 3D content -- this project's
+   // own highway wants the latter, so skip the clear for ScoreView
+   // specifically (Backglass/Topper, which nothing here uses, are left
+   // untouched). The ONLY known cost: ClearEmbeddedAncillaryWindow's
+   // own comment notes it also clears depth "to avoid AO artefacts" in
+   // that region -- skipping it could in theory leave stale depth
+   // values from the 3D scene affecting AO/bloom right at the
+   // highway's edges; not observed as a visible problem in testing,
+   // but if it ever becomes one, define
+   // YARG_DISABLE_SCOREVIEW_CLEAR_SKIP to fully revert to stock
+   // behavior (opaque ScoreView again) with no other code changes.
+#else
    ClearEmbeddedAncillaryWindow(VPXWindowId::VPXWINDOW_ScoreView, g_pplayer->m_scoreViewOutput, renderedRT);
+#endif
    ClearEmbeddedAncillaryWindow(VPXWindowId::VPXWINDOW_Topper, g_pplayer->m_topperOutput, renderedRT);
 
    // Compute AO contribution (to be applied later, with tonemapping)
