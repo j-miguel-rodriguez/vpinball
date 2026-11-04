@@ -363,6 +363,25 @@ private:
    void SwapBackBufferRenderTargets();
    void ResizeRenderTargets(); // Follows the playfield window size (resizable editor window, mobile rotation)
 
+   // YARG + VPX integration -- last-resort patch, documented in
+   // vpx-yarg's docs/ball-reflection-fix.md. GetPreviousBackBufferTexture()
+   // (used as the ball shader's own reflection source, see
+   // Render3DScene()'s tex_ball_playfield binding) is the PREVIOUS
+   // frame's fully composited backbuffer, which already has embedded
+   // ancillary windows (ScoreView/Backglass/Topper) baked into it --
+   // meaning any content drawn there bleeds into the ball's own
+   // reflection every frame. This is a snapshot taken BEFORE that
+   // compositing happens, used as the reflection source instead --
+   // but only populated (and so only has any effect at all) when at
+   // least one embedded ancillary window is actually active that
+   // frame; see Render3DScene()'s own gating. Stays permanently null,
+   // with zero behavior or performance change, on any table/session
+   // that never uses embedded ancillary rendering. Define
+   // YARG_DISABLE_BALL_REFLECTION_ANCILLARY_FIX to fully revert to the
+   // original behavior with no other code changes, if this ever causes
+   // a problem on some real table.
+   RenderTarget* m_yargBallReflectionCleanRT = nullptr;
+
    RenderTarget* m_pAORenderTarget1 = nullptr;
    RenderTarget* m_pAORenderTarget2 = nullptr;
    RenderTarget* GetAORenderTarget(int idx);
