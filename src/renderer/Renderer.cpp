@@ -3562,6 +3562,34 @@ void Renderer::Render3DScene()
    m_embeddedRegions.clear();
    RenderAncillaryWindow(VPXWindowId::VPXWINDOW_Backglass, g_pplayer->m_backglassOutput, renderedRT, g_pplayer->m_ancillaryWndRenderers[VPXWindowId::VPXWINDOW_Backglass]);
    RenderAncillaryWindow(VPXWindowId::VPXWINDOW_ScoreView, g_pplayer->m_scoreViewOutput, renderedRT, g_pplayer->m_ancillaryWndRenderers[VPXWindowId::VPXWINDOW_ScoreView]);
+#ifndef YARG_DISABLE_SCOREVIEW_BALL_OVERLAY
+   // YARG + VPX integration: ScoreView's own content (our highway) is
+   // composited in by the call just above, AFTER the whole 3D scene
+   // (ball included) was already rendered for this frame -- so without
+   // this, the highway always visually sits on top of the ball, which
+   // is why YARG_DISABLE_SCOREVIEW_CLEAR_SKIP above exists (opacity is
+   // the only lever otherwise). Re-rendering the ball(s) here instead
+   // makes the ball sit on top of the highway, wherever it actually
+   // belongs: Ball::Render() depth-tests by default, and the depth
+   // buffer from the main pass is left untouched (ScoreView's clear,
+   // which also cleared depth, is skipped), so each ball only passes
+   // where it's really positioned -- a ball mesh only rasterizes the
+   // handful of screen pixels it actually projects to, so this is a
+   // harmless no-op redraw everywhere else on the table, not real
+   // overdraw. No explicit scissor rect needed either: nothing has
+   // called SetRenderTarget() since RenderAncillaryWindow(ScoreView...)
+   // above, so this still runs inside ScoreView's own render pass,
+   // which already has its m_areaOfInterest scissor confined to the
+   // ScoreView rectangle -- these draws inherit it automatically.
+   // This DOES depend on staying the last thing appended to that pass:
+   // if Backglass or Topper (unused by this project) were ever enabled
+   // too, their own RenderAncillaryWindow call below would switch to a
+   // NEW pass scissored to THEIR rect instead, silently breaking this.
+   // Define YARG_DISABLE_SCOREVIEW_BALL_OVERLAY to drop this and go
+   // back to the highway always covering the ball.
+   for (Ball* const ball : g_pplayer->m_vball)
+      ball->Render(Renderer::DEFAULT);
+#endif
    RenderAncillaryWindow(VPXWindowId::VPXWINDOW_Topper, g_pplayer->m_topperOutput, renderedRT, g_pplayer->m_ancillaryWndRenderers[VPXWindowId::VPXWINDOW_Topper]);
 
    const bool hasAntialiasPass = m_FXAA != Disabled;
