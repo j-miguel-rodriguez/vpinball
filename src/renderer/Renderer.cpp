@@ -393,7 +393,6 @@ Renderer::~Renderer()
    delete m_staticPrepassRT;
    delete m_pOffscreenBackBufferTexture1;
    delete m_pOffscreenBackBufferTexture2;
-   delete m_yargBallReflectionCleanRT;
    delete m_pBloomBufferTexture;
    delete m_pBloomTmpBufferTexture;
    delete m_pPostProcessRenderTarget1;
@@ -3462,19 +3461,7 @@ void Renderer::Render3DScene()
    }
    // We don't need to set the dependency on the previous frame render as this would be a cross frame dependency which does not have any meaning since dependencies are resolved per frame
    // m_renderDevice->AddRenderTargetDependency(m_renderDevice->GetPreviousBackBufferTexture());
-#ifndef YARG_DISABLE_BALL_REFLECTION_ANCILLARY_FIX
-   // YARG + VPX integration: prefer the clean (pre-ancillary-compositing)
-   // snapshot taken at the tail of the PREVIOUS frame (see the Duplicate/
-   // BlitRenderTarget block below, right after ApplyAdditiveScreenSpaceReflection)
-   // over the raw previous backbuffer, which has embedded ancillary windows
-   // (ScoreView/Backglass/Topper) baked in and so bleeds into the ball's own
-   // reflection. Falls back to the original source when no embedded ancillary
-   // window has ever been active (m_yargBallReflectionCleanRT stays null).
-   m_renderDevice->m_ballShader->SetTexture(ShaderUniform::tex_ball_playfield,
-      (m_yargBallReflectionCleanRT != nullptr ? m_yargBallReflectionCleanRT : GetPreviousBackBufferTexture())->GetColorSampler());
-#else
    m_renderDevice->m_ballShader->SetTexture(ShaderUniform::tex_ball_playfield, GetPreviousBackBufferTexture()->GetColorSampler());
-#endif
 
    // If using static prerendering, apply nudging by shaking the screen (otherwise, apply table displacement)
    if (!m_disableStaticPrepass && m_visualNudgeStrength > 0.0f && g_pplayer->m_playMode != Player::PlayMode::CaptureAttract)
@@ -3529,47 +3516,6 @@ void Renderer::Render3DScene()
 
    // Add screen space reflections
    renderedRT = ApplyAdditiveScreenSpaceReflection(renderedRT);
-
-#ifndef YARG_DISABLE_BALL_REFLECTION_ANCILLARY_FIX
-   // YARG + VPX integration: snapshot the backbuffer here, before any
-   // embedded ancillary window (ScoreView/Backglass/Topper) gets composited
-   // into it below. This is what the ball shader's reflection sampler reads
-   // from NEXT frame (see the tex_ball_playfield binding above) instead of
-   // the raw previous backbuffer, which would otherwise carry this frame's
-   // ancillary content straight into the ball's own reflection. Only ever
-   // allocated (and so only has any effect) once at least one embedded
-   // ancillary window is actually active -- zero cost on any table/session
-   // that never uses one. Define YARG_DISABLE_BALL_REFLECTION_ANCILLARY_FIX
-   // to fully revert to the original behavior with no other code changes.
-   if (g_pplayer->m_backglassOutput.GetMode() == VPX::RenderOutput::OM_EMBEDDED
-      || g_pplayer->m_scoreViewOutput.GetMode() == VPX::RenderOutput::OM_EMBEDDED
-      || g_pplayer->m_topperOutput.GetMode() == VPX::RenderOutput::OM_EMBEDDED)
-   {
-      if (m_yargBallReflectionCleanRT == nullptr)
-         m_yargBallReflectionCleanRT = renderedRT->Duplicate("YargBallReflectionClean"s, false);
-      // BlitRenderTarget asserts the destination is already the active render
-      // pass's target (RenderDevice.cpp's own assert(m_currentPass->m_rt ==
-      // destination), needed for correct render-pass-dependency sorting) --
-      // same SetRenderTarget-before/-after dance as the MSAA resolve above,
-      // which this was supposed to mirror from the start. Missing it meant
-      // the copy silently landed in the wrong pass in a Release build (no
-      // assert to catch it), so this never actually produced a clean
-      // snapshot -- confirmed as the reason the fix showed no difference.
-      RenderPass* const initial_rt = m_renderDevice->GetCurrentPass();
-      m_renderDevice->SetRenderTarget("YargBallReflectionClean"s, m_yargBallReflectionCleanRT);
-      m_renderDevice->BlitRenderTarget(renderedRT, m_yargBallReflectionCleanRT, true, false);
-      m_renderDevice->SetRenderTarget(initial_rt->m_name, initial_rt->m_rt);
-      initial_rt->m_name += '-';
-      // SetRenderTarget() above only wires the new (restored) pass's
-      // dependency back to renderedRT's PREVIOUS writer (initial_rt) --
-      // nothing automatically chains it to the blit pass we just ran, since
-      // they're siblings off that same ancestor, not a direct edge. Without
-      // this, the pass sorter is free to schedule the ancillary-window
-      // writes below either before or after our blit, silently reproducing
-      // the exact bug this is meant to fix. Force the explicit order.
-      m_renderDevice->AddRenderTargetDependency(m_yargBallReflectionCleanRT);
-   }
-#endif
 
    // Clear embedded ancillary windows before updarting bloom & AO
    ClearEmbeddedAncillaryWindow(VPXWindowId::VPXWINDOW_Backglass, g_pplayer->m_backglassOutput, renderedRT);
