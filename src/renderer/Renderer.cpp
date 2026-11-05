@@ -3576,17 +3576,31 @@ void Renderer::Render3DScene()
    // where it's really positioned -- a ball mesh only rasterizes the
    // handful of screen pixels it actually projects to, so this is a
    // harmless no-op redraw everywhere else on the table, not real
-   // overdraw. No explicit scissor rect needed either: nothing has
-   // called SetRenderTarget() since RenderAncillaryWindow(ScoreView...)
-   // above, so this still runs inside ScoreView's own render pass,
-   // which already has its m_areaOfInterest scissor confined to the
-   // ScoreView rectangle -- these draws inherit it automatically.
-   // This DOES depend on staying the last thing appended to that pass:
-   // if Backglass or Topper (unused by this project) were ever enabled
-   // too, their own RenderAncillaryWindow call below would switch to a
-   // NEW pass scissored to THEIR rect instead, silently breaking this.
-   // Define YARG_DISABLE_SCOREVIEW_BALL_OVERLAY to drop this and go
-   // back to the highway always covering the ball.
+   // overdraw.
+   //
+   // A first attempt appended this straight into ScoreView's own
+   // render pass (no SetRenderTarget call in between) and confirmed
+   // on-device: the ball rendered BEHIND the highway's own content
+   // anyway. Cause: Ball::Render()'s mesh draw uses DrawMesh(...,
+   // isTranparentPass=false, ...) (opaque), while the highway's own
+   // content (DrawImage -> DrawTexturedQuad(..., true, ...)) is
+   // explicitly transparent -- a render pass buckets opaque and
+   // transparent commands separately and runs the opaque bucket
+   // first, REGARDLESS of submission order, so our ball draws kept
+   // getting hoisted to run before the highway's transparent draws no
+   // matter where in the pass they were appended.
+   //
+   // Fixed by forcing a brand new pass here (forceNewPass=true):
+   // pass-level dependency ordering (SetRenderTarget's own
+   // AddPrecursor(renderedRT->m_lastRenderPass), not intra-pass
+   // opaque/transparent bucketing, governs ordering between passes,
+   // so this is guaranteed to run only once ScoreView's entire pass
+   // (highway content included) has completed. No scissor needed: a
+   // ball mesh only rasterizes the pixels it actually covers, so an
+   // unclipped new pass is still a no-op everywhere outside the
+   // highway -- this also means, unlike the first attempt, there's no
+   // dependency on Backglass/Topper staying unused.
+   m_renderDevice->SetRenderTarget("YargBallOverlay"s, renderedRT, true, true);
    for (Ball* const ball : g_pplayer->m_vball)
       ball->Render(Renderer::DEFAULT);
 #endif
