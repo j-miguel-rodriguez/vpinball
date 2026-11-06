@@ -3518,7 +3518,17 @@ void Renderer::Render3DScene()
    renderedRT = ApplyAdditiveScreenSpaceReflection(renderedRT);
 
    // Clear embedded ancillary windows before updarting bloom & AO
+#ifndef YARG_DISABLE_BACKGLASS_CLEAR_SKIP
+   // YARG + VPX integration: same fix as YARG_DISABLE_SCOREVIEW_CLEAR_SKIP
+   // below, now also applied to Backglass -- this project's second
+   // overlay (the PartyKeys controller mirror, YargVpxPlugin.cpp) uses
+   // this window too, and needs the same see-through treatment the
+   // highway needed on ScoreView. Define
+   // YARG_DISABLE_BACKGLASS_CLEAR_SKIP to fully revert this one window
+   // to stock (opaque) behavior without affecting ScoreView.
+#else
    ClearEmbeddedAncillaryWindow(VPXWindowId::VPXWINDOW_Backglass, g_pplayer->m_backglassOutput, renderedRT);
+#endif
 #ifndef YARG_DISABLE_SCOREVIEW_CLEAR_SKIP
    // YARG + VPX integration: this is the REAL fix for the ball
    // disappearing under the highway -- ClearEmbeddedAncillaryWindow()
@@ -3534,15 +3544,14 @@ void Renderer::Render3DScene()
    // ancillary-window mechanism assumes a solid scoreboard/DMD panel,
    // not a see-through overlay over live 3D content -- this project's
    // own highway wants the latter, so skip the clear for ScoreView
-   // specifically (Backglass/Topper, which nothing here uses, are left
-   // untouched). The ONLY known cost: ClearEmbeddedAncillaryWindow's
-   // own comment notes it also clears depth "to avoid AO artefacts" in
-   // that region -- skipping it could in theory leave stale depth
-   // values from the 3D scene affecting AO/bloom right at the
-   // highway's edges; not observed as a visible problem in testing,
-   // but if it ever becomes one, define
-   // YARG_DISABLE_SCOREVIEW_CLEAR_SKIP to fully revert to stock
-   // behavior (opaque ScoreView again) with no other code changes.
+   // specifically (Topper, which nothing here uses, is left untouched).
+   // The ONLY known cost: ClearEmbeddedAncillaryWindow's own comment
+   // notes it also clears depth "to avoid AO artefacts" in that region
+   // -- skipping it could in theory leave stale depth values from the
+   // 3D scene affecting AO/bloom right at the highway's edges; not
+   // observed as a visible problem in testing, but if it ever becomes
+   // one, define YARG_DISABLE_SCOREVIEW_CLEAR_SKIP to fully revert to
+   // stock behavior (opaque ScoreView again) with no other code changes.
 #else
    ClearEmbeddedAncillaryWindow(VPXWindowId::VPXWINDOW_ScoreView, g_pplayer->m_scoreViewOutput, renderedRT);
 #endif
@@ -3561,6 +3570,16 @@ void Renderer::Render3DScene()
    // table's tonemapper. Only the color grade has to be kept off them, which ApplyTonemapping does
    m_embeddedRegions.clear();
    RenderAncillaryWindow(VPXWindowId::VPXWINDOW_Backglass, g_pplayer->m_backglassOutput, renderedRT, g_pplayer->m_ancillaryWndRenderers[VPXWindowId::VPXWINDOW_Backglass]);
+#ifndef YARG_DISABLE_BACKGLASS_BALL_OVERLAY
+   // YARG + VPX integration: same fix as YARG_DISABLE_SCOREVIEW_BALL_OVERLAY
+   // below, now also applied to Backglass -- see that block for the full
+   // explanation (opaque/transparent command bucketing, fixed by forcing
+   // a new render pass). Define YARG_DISABLE_BACKGLASS_BALL_OVERLAY to
+   // revert just this window.
+   m_renderDevice->SetRenderTarget("YargBallOverlay"s, renderedRT, true, true);
+   for (Ball* const ball : g_pplayer->m_vball)
+      ball->Render(Renderer::DEFAULT);
+#endif
    RenderAncillaryWindow(VPXWindowId::VPXWINDOW_ScoreView, g_pplayer->m_scoreViewOutput, renderedRT, g_pplayer->m_ancillaryWndRenderers[VPXWindowId::VPXWINDOW_ScoreView]);
 #ifndef YARG_DISABLE_SCOREVIEW_BALL_OVERLAY
    // YARG + VPX integration: ScoreView's own content (our highway) is
