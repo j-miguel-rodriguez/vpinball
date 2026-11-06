@@ -32,6 +32,7 @@ set(YARG_PLUGIN_SOURCES
    "${YARG_PLUGIN_SOURCE_DIR}/NativeEngine.cpp"
    "${YARG_PLUGIN_SOURCE_DIR}/AudioClock.cpp"
    "${YARG_PLUGIN_SOURCE_DIR}/Highway.cpp"
+   "${YARG_PLUGIN_SOURCE_DIR}/PartyKeysOverlay.cpp"
    "${YARG_PLUGIN_SOURCE_DIR}/iOSChartPath.mm"
    "${YARG_PLUGIN_SOURCE_DIR}/iOSGuitarDiagnostic.mm"
    "${YARG_PLUGIN_SOURCE_DIR}/iOSMidiInput.mm"
