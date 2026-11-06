@@ -33,10 +33,32 @@ set(YARG_PLUGIN_SOURCES
    "${YARG_PLUGIN_SOURCE_DIR}/AudioClock.cpp"
    "${YARG_PLUGIN_SOURCE_DIR}/Highway.cpp"
    "${YARG_PLUGIN_SOURCE_DIR}/PartyKeysOverlay.cpp"
+   "${YARG_PLUGIN_SOURCE_DIR}/AUv3Host.cpp"
+   "${YARG_PLUGIN_SOURCE_DIR}/AUv3Discovery.mm"
    "${YARG_PLUGIN_SOURCE_DIR}/iOSChartPath.mm"
    "${YARG_PLUGIN_SOURCE_DIR}/iOSGuitarDiagnostic.mm"
    "${YARG_PLUGIN_SOURCE_DIR}/iOSMidiInput.mm"
 )
+
+# JUCE, module-only: no juce_add_gui_app()/juce_add_plugin(), no
+# JUCEApplication, no app wrapper of any kind -- VPX keeps its own app
+# lifecycle, build, and main loop entirely. This exists purely to reuse
+# juce::AudioPluginFormatManager/AudioUnitPluginFormat/AudioPluginInstance
+# (juce_audio_processors) for hosting Minimoog Model D's AUv3 as the
+# click track's voice (AUv3Host.h/.cpp, ported from moog-juce's
+# HelloWorldJam, where this exact hosting approach -- including the
+# AVAudioUnitComponentManager-based discovery workaround in
+# AUv3Discovery.mm, since JUCE's own AU discovery misses third-party
+# AUv3 app extensions -- is already proven working on real hardware).
+# Same pinned tag as that project's own CMakeLists.txt, for parity.
+include(FetchContent)
+FetchContent_Declare(
+   JUCE
+   GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
+   GIT_TAG 7.0.12
+   GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(JUCE)
 
 if(BUILD_STATIC)
    add_compile_options(-fPIC)
@@ -83,6 +105,14 @@ if(BUILD_STATIC)
       LANGUAGE OBJCXX
    )
 
+   # AUv3Discovery.mm: AVAudioUnitComponentManager-based AU discovery
+   # (JUCE's own AU discovery misses third-party AUv3 app extensions --
+   # see AUv3Host.cpp's own comment). Same .mm default-detection note as
+   # iOSChartPath.mm above.
+   set_source_files_properties("${YARG_PLUGIN_SOURCE_DIR}/AUv3Discovery.mm" PROPERTIES
+      LANGUAGE OBJCXX
+   )
+
    add_library(YargPlugin STATIC ${YARG_PLUGIN_SOURCES})
 
    set_target_properties(YargPlugin PROPERTIES
@@ -111,7 +141,36 @@ if(BUILD_STATIC)
    target_compile_definitions(YargPlugin PRIVATE
       YARG_STATIC_LINK_NATIVE_ENGINE
       YARG_NEW_VPX_PLUGIN_API
+      # Normally set automatically by juce_add_gui_app(PLUGINHOST_AU TRUE)
+      # (moog-juce's own CMakeLists.txt) -- set directly here instead,
+      # since this project deliberately never calls that app-wrapper
+      # function. Only gates JUCE's OWN AU-hosting code into existing;
+      # it has no effect on the entitlement AU discovery separately
+      # needs (VPinball.entitlements' own inter-app-audio key).
+      JUCE_PLUGINHOST_AU=1
+      JUCE_WEB_BROWSER=0
+      JUCE_USE_CURL=0
+      JUCE_DISPLAY_SPLASH_SCREEN=0
    )
+
+   # JUCE module linkage: juce_audio_processors (AudioPluginFormatManager/
+   # AudioUnitPluginFormat/AudioPluginInstance, what AUv3Host.cpp wraps)
+   # declares a hard module dependency on juce_gui_extra ->
+   # juce_gui_basics -> juce_graphics (confirmed directly from each
+   # module's own juce_*.h "dependencies:" declaration, not guessed --
+   # AudioProcessorEditor is itself a juce::Component, and the AU-hosting
+   # code internally needs the native view-wrapping juce_gui_extra
+   # provides, even though this project never displays any JUCE-owned
+   # window). Linking the top-level module pulls in that whole chain
+   # automatically; juce_generate_juce_header() below is what lets
+   # AUv3Host.cpp #include <JuceHeader.h> instead of each module header
+   # individually.
+   target_link_libraries(YargPlugin PRIVATE
+      juce::juce_core
+      juce::juce_audio_basics
+      juce::juce_audio_processors
+   )
+   juce_generate_juce_header(YargPlugin)
 
    # yargcore-native-ios.dylib: step 2's own artifact (vpx-yarg's
    # docs/05-ios-step2.md), published via `dotnet publish -r ios-arm64`

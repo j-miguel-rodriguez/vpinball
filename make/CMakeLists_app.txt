@@ -884,6 +884,21 @@ elseif(PLATFORM STREQUAL "ios" OR PLATFORM STREQUAL "ios-simulator" OR PLATFORM 
          "-framework Network"
          "-framework Security"
          "-framework GSS"
+         # YARG + VPX integration project: JUCE module dependencies for
+         # AUv3 hosting (AUv3Host.cpp/docs/STATUS.md) -- same
+         # listed-directly-here reasoning as the block above. Collected
+         # from every module's own "iOSFrameworks:" declaration across
+         # juce_audio_processors' full dependency chain (juce_audio_basics,
+         # juce_gui_extra -> juce_gui_basics -> juce_graphics), not
+         # guessed; CoreAudioKit/AudioToolbox/AVFoundation/CoreGraphics/
+         # CoreText/QuartzCore/CoreServices/UIKit/Foundation/CoreMedia/
+         # Metal were already present above for other reasons.
+         "-framework Accelerate"
+         "-framework CoreImage"
+         "-framework MetalKit"
+         "-framework UniformTypeIdentifiers"
+         "-framework WebKit"
+         "-framework UserNotifications"
       )
    elseif(PLATFORM STREQUAL "android")
       target_link_libraries(vpinball PUBLIC
