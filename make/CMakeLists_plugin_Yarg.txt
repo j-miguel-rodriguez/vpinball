@@ -83,7 +83,14 @@ FetchContent_Declare(
    # root (<name>_SOURCE_DIR), per FetchContent/ExternalProject's own
    # documented behavior -- a path relative to that, not an absolute
    # guess at the binary-dir layout.
-   PATCH_COMMAND sed -i "" "s/#if JUCE_MAC_API_VERSION_MIN_REQUIRED_AT_LEAST (14, 4)/#if 1 \/\/ vpx-yarg: force ScreenCaptureKit path, CGWindowListCreateImage is obsoleted on this SDK/" modules/juce_gui_basics/native/juce_Windowing_mac.mm
+   # "|" delimiter, not the usual "/": the replacement text would
+   # otherwise need a literal "//" for its own C++ comment, which a
+   # first attempt found BSD sed's -i actually can't be made to escape
+   # correctly when routed through CMake's own PATCH_COMMAND argument
+   # tokenization ("bad flag in substitute command: '/'", a real CI
+   # error, not guessed) -- switching delimiter sidesteps needing any
+   # escaping at all, so the comment is dropped too, simplest fix.
+   PATCH_COMMAND sed -i "" "s|#if JUCE_MAC_API_VERSION_MIN_REQUIRED_AT_LEAST (14, 4)|#if 1|" modules/juce_gui_basics/native/juce_Windowing_mac.mm
 )
 FetchContent_MakeAvailable(JUCE)
 
