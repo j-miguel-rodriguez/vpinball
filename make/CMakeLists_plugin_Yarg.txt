@@ -54,38 +54,36 @@ set(YARG_PLUGIN_SOURCES
 #
 # juceaide (JUCE's own build-time code-gen tool, which its CMake machinery
 # always builds as a macOS HOST executable regardless of -DPLATFORM=ios --
-# this is a separate, native sub-build, not part of the iOS arm64 cross-
-# compile) failed its own first real CI run here: juce_gui_basics.mm's
+# a separate, native sub-build, not part of the iOS arm64 cross-compile)
+# failed its own first real CI run here: juce_gui_basics.mm's
 # createNSWindowSnapshot() uses the legacy CGWindowListCreateImage API,
-# now fully obsoleted (a hard compile error, not just a deprecation
-# warning, under Apple's own API_DEPRECATED "obsoleted" mechanism) on the
-# macOS 26 SDK this CI runner's default Xcode bundles. JUCE's own code
-# already has the fix for this (a ScreenCaptureKit-based path, gated
-# behind JUCE_MAC_API_VERSION_MIN_REQUIRED_AT_LEAST(14,4), which checks
-# CMAKE_OSX_DEPLOYMENT_TARGET) -- it just never routes there because that
-# variable is left unset for juceaide's own sub-build. Setting it here,
-# before JUCE's own CMakeLists.txt runs, is the actually-intended fix
-# (not a patch to JUCE's source): confirmed by reading the real failing
-# source and its own #if condition, not guessed.
-set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0" CACHE STRING "" FORCE)
-# Belt and suspenders: the CACHE var alone didn't fix this on the first
-# real attempt (same error, unchanged, on the next CI run) -- root cause
-# unconfirmed (juceaide's own re-invoked `cmake` sub-build, via
-# execute_process in its CMakeLists.txt, only forwards
-# CMAKE_OSX_DEPLOYMENT_TARGET if the variable is already truthy at that
-# point; something about -DPLATFORM=ios's own toolchain setup may be
-# clearing or shadowing it before then). The environment variable is
-# read directly by clang/CMake's own AppleClang support independently
-# of any CMake-variable-propagation subtlety, and env vars always reach
-# a child execute_process regardless -- sidesteps the question entirely.
-set(ENV{MACOSX_DEPLOYMENT_TARGET} "15.0")
-
+# which the macOS 26 SDK this CI runner's default Xcode bundles marks
+# fully obsoleted -- a hard compile error, unconditionally, regardless of
+# deployment target (confirmed the hard way: setting
+# CMAKE_OSX_DEPLOYMENT_TARGET as both a CACHE variable, matching the
+# macro that's supposed to gate this -- JUCE_MAC_API_VERSION_MIN_REQUIRED_
+# AT_LEAST(14,4) -- and as the MACOSX_DEPLOYMENT_TARGET environment
+# variable, made no difference across two real CI attempts; Apple's own
+# "obsoleted" availability tier appears to disable the symbol for this
+# SDK outright, not conditionally on deployment target the way merely
+# "deprecated" ones do). Patches the #if directly instead, forcing the
+# already-present modern ScreenCaptureKit code path unconditionally --
+# correctness of the path not taken is irrelevant here, since juceaide
+# is a code-gen tool that never actually calls this function; the goal
+# is only getting the translation unit to compile. sed, not git apply,
+# so a second configure (file already patched) is a safe no-op rather
+# than a failing already-applied-patch error.
 include(FetchContent)
 FetchContent_Declare(
    JUCE
    GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
    GIT_TAG 7.0.12
    GIT_SHALLOW TRUE
+   # PATCH_COMMAND's own working directory is the freshly-fetched source
+   # root (<name>_SOURCE_DIR), per FetchContent/ExternalProject's own
+   # documented behavior -- a path relative to that, not an absolute
+   # guess at the binary-dir layout.
+   PATCH_COMMAND sed -i "" "s/#if JUCE_MAC_API_VERSION_MIN_REQUIRED_AT_LEAST (14, 4)/#if 1 \/\/ vpx-yarg: force ScreenCaptureKit path, CGWindowListCreateImage is obsoleted on this SDK/" modules/juce_gui_basics/native/juce_Windowing_mac.mm
 )
 FetchContent_MakeAvailable(JUCE)
 
