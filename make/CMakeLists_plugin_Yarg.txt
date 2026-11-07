@@ -56,23 +56,26 @@ set(YARG_PLUGIN_SOURCES
 # always builds as a macOS HOST executable regardless of -DPLATFORM=ios --
 # a separate, native sub-build, not part of the iOS arm64 cross-compile)
 # failed its own first real CI run here: juce_gui_basics.mm's
-# createNSWindowSnapshot() uses the legacy CGWindowListCreateImage API,
-# which the macOS 26 SDK this CI runner's default Xcode bundles marks
-# fully obsoleted -- a hard compile error, unconditionally, regardless of
-# deployment target (confirmed the hard way: setting
-# CMAKE_OSX_DEPLOYMENT_TARGET as both a CACHE variable, matching the
-# macro that's supposed to gate this -- JUCE_MAC_API_VERSION_MIN_REQUIRED_
-# AT_LEAST(14,4) -- and as the MACOSX_DEPLOYMENT_TARGET environment
-# variable, made no difference across two real CI attempts; Apple's own
-# "obsoleted" availability tier appears to disable the symbol for this
-# SDK outright, not conditionally on deployment target the way merely
-# "deprecated" ones do). Patches the #if directly instead, forcing the
-# already-present modern ScreenCaptureKit code path unconditionally --
-# correctness of the path not taken is irrelevant here, since juceaide
-# is a code-gen tool that never actually calls this function; the goal
-# is only getting the translation unit to compile. sed, not git apply,
-# so a second configure (file already patched) is a safe no-op rather
-# than a failing already-applied-patch error.
+# createNSWindowSnapshot() calls the legacy CGWindowListCreateImage API
+# unconditionally (JUCE 7.0.12 -- the pinned tag actually being built --
+# has no ScreenCaptureKit-based alternative at all; that was added in a
+# later JUCE release, confirmed by fetching and reading this exact
+# pinned tag's real source directly, not a newer local checkout that
+# first looked similar but turned out to have a materially different
+# function here), and the macOS 26 SDK this CI runner's default Xcode
+# bundles marks that API fully obsoleted -- a hard compile error,
+# unconditionally, regardless of deployment target. Several earlier
+# attempts at fixing this (setting CMAKE_OSX_DEPLOYMENT_TARGET and
+# MACOSX_DEPLOYMENT_TARGET; patching a #if condition that, it turned
+# out, doesn't exist in this JUCE version at all) went nowhere, in one
+# case because CMake's PATCH_COMMAND string-argument handling silently
+# mishandled a complex inline bash -c command. patch-juce-screenshot.sh
+# (a real file, tested locally against the actual fetched 7.0.12
+# source before being trusted here) sidesteps all of that: it stubs the
+# obsoleted call out entirely, verifying both before and after that it
+# did something. Correctness of the stub is irrelevant -- juceaide
+# never actually calls createNSWindowSnapshot() at runtime, only
+# compiling it matters.
 include(FetchContent)
 FetchContent_Declare(
    JUCE
@@ -81,27 +84,8 @@ FetchContent_Declare(
    GIT_SHALLOW TRUE
    # PATCH_COMMAND's own working directory is the freshly-fetched source
    # root (<name>_SOURCE_DIR), per FetchContent/ExternalProject's own
-   # documented behavior -- a path relative to that, not an absolute
-   # guess at the binary-dir layout.
-   # "|" delimiter, not the usual "/": the replacement text would
-   # otherwise need a literal "//" for its own C++ comment, which a
-   # first attempt found BSD sed's -i actually can't be made to escape
-   # correctly when routed through CMake's own PATCH_COMMAND argument
-   # tokenization ("bad flag in substitute command: '/'", a real CI
-   # error, not guessed) -- switching delimiter sidesteps needing any
-   # escaping at all, so the comment is dropped too, simplest fix.
-   #
-   # Wrapped in bash -c with an explicit grep-based verification
-   # (failing loudly, with its own distinct message, if the pattern
-   # isn't found before AND isn't gone after) rather than a bare sed
-   # invocation: the previous attempt's CI log showed no
-   # "Performing patch step" output at all -- unlike the one before it,
-   # which did, even though it failed -- suggesting CMake's own
-   # PATCH_COMMAND list-argument handling may be dropping or
-   # mis-tokenizing the standalone "" (BSD sed's required empty backup-
-   # suffix argument) silently. This makes the next run's log say
-   # definitively what happened instead of guessing again.
-   PATCH_COMMAND bash -c "set -e; f=modules/juce_gui_basics/native/juce_Windowing_mac.mm; grep -q 'JUCE_MAC_API_VERSION_MIN_REQUIRED_AT_LEAST (14, 4)' \"$f\" || { echo 'vpx-yarg PATCH_COMMAND: pattern already absent before patching -- was it applied twice, or does this JUCE version differ from what was read?'; exit 1; }; sed -i '' \"s|#if JUCE_MAC_API_VERSION_MIN_REQUIRED_AT_LEAST (14, 4)|#if 1|\" \"$f\"; grep -q 'JUCE_MAC_API_VERSION_MIN_REQUIRED_AT_LEAST (14, 4)' \"$f\" && { echo 'vpx-yarg PATCH_COMMAND: sed ran but the pattern is still present -- patch had no effect'; exit 1; }; echo 'vpx-yarg PATCH_COMMAND: juce_Windowing_mac.mm patched successfully'"
+   # documented behavior.
+   PATCH_COMMAND bash "${CMAKE_CURRENT_LIST_DIR}/patch-juce-screenshot.sh"
 )
 FetchContent_MakeAvailable(JUCE)
 
