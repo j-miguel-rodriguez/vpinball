@@ -191,15 +191,26 @@ if(BUILD_STATIC)
    # code internally needs the native view-wrapping juce_gui_extra
    # provides, even though this project never displays any JUCE-owned
    # window). Linking the top-level module pulls in that whole chain
-   # automatically; juce_generate_juce_header() below is what lets
-   # AUv3Host.cpp #include <JuceHeader.h> instead of each module header
-   # individually.
+   # automatically. juce_generate_juce_header() (the usual way to let
+   # code #include <JuceHeader.h> instead of each module header
+   # individually) doesn't work here -- a real CI error confirmed it
+   # requires the target to have been created via a juce_add_* function
+   # (juce_add_plugin/juce_add_gui_app/etc, each of which sets up a
+   # "generated sources directory" juce_generate_juce_header() needs),
+   # which YargPlugin deliberately isn't (it's a plain add_library
+   # STATIC, no app/plugin wrapper of any kind -- the whole point of
+   # linking JUCE module-only). AUv3Host.h includes the specific module
+   # header it needs directly instead (juce_audio_processors/
+   # juce_audio_processors.h, JUCE's own documented non-amalgamated
+   # include path, resolvable because linking a module target already
+   # adds its own include path) -- fully qualified juce:: names
+   # throughout that file mean this doesn't need JuceHeader.h's own
+   # implicit "using namespace juce;" either.
    target_link_libraries(YargPlugin PRIVATE
       juce::juce_core
       juce::juce_audio_basics
       juce::juce_audio_processors
    )
-   juce_generate_juce_header(YargPlugin)
 
    # yargcore-native-ios.dylib: step 2's own artifact (vpx-yarg's
    # docs/05-ios-step2.md), published via `dotnet publish -r ios-arm64`
