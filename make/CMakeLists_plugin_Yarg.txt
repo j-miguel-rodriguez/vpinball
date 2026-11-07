@@ -90,7 +90,18 @@ FetchContent_Declare(
    # tokenization ("bad flag in substitute command: '/'", a real CI
    # error, not guessed) -- switching delimiter sidesteps needing any
    # escaping at all, so the comment is dropped too, simplest fix.
-   PATCH_COMMAND sed -i "" "s|#if JUCE_MAC_API_VERSION_MIN_REQUIRED_AT_LEAST (14, 4)|#if 1|" modules/juce_gui_basics/native/juce_Windowing_mac.mm
+   #
+   # Wrapped in bash -c with an explicit grep-based verification
+   # (failing loudly, with its own distinct message, if the pattern
+   # isn't found before AND isn't gone after) rather than a bare sed
+   # invocation: the previous attempt's CI log showed no
+   # "Performing patch step" output at all -- unlike the one before it,
+   # which did, even though it failed -- suggesting CMake's own
+   # PATCH_COMMAND list-argument handling may be dropping or
+   # mis-tokenizing the standalone "" (BSD sed's required empty backup-
+   # suffix argument) silently. This makes the next run's log say
+   # definitively what happened instead of guessing again.
+   PATCH_COMMAND bash -c "set -e; f=modules/juce_gui_basics/native/juce_Windowing_mac.mm; grep -q 'JUCE_MAC_API_VERSION_MIN_REQUIRED_AT_LEAST (14, 4)' \"$f\" || { echo 'vpx-yarg PATCH_COMMAND: pattern already absent before patching -- was it applied twice, or does this JUCE version differ from what was read?'; exit 1; }; sed -i '' \"s|#if JUCE_MAC_API_VERSION_MIN_REQUIRED_AT_LEAST (14, 4)|#if 1|\" \"$f\"; grep -q 'JUCE_MAC_API_VERSION_MIN_REQUIRED_AT_LEAST (14, 4)' \"$f\" && { echo 'vpx-yarg PATCH_COMMAND: sed ran but the pattern is still present -- patch had no effect'; exit 1; }; echo 'vpx-yarg PATCH_COMMAND: juce_Windowing_mac.mm patched successfully'"
 )
 FetchContent_MakeAvailable(JUCE)
 
