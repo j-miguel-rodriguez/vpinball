@@ -51,6 +51,24 @@ set(YARG_PLUGIN_SOURCES
 # AUv3Discovery.mm, since JUCE's own AU discovery misses third-party
 # AUv3 app extensions -- is already proven working on real hardware).
 # Same pinned tag as that project's own CMakeLists.txt, for parity.
+#
+# juceaide (JUCE's own build-time code-gen tool, which its CMake machinery
+# always builds as a macOS HOST executable regardless of -DPLATFORM=ios --
+# this is a separate, native sub-build, not part of the iOS arm64 cross-
+# compile) failed its own first real CI run here: juce_gui_basics.mm's
+# createNSWindowSnapshot() uses the legacy CGWindowListCreateImage API,
+# now fully obsoleted (a hard compile error, not just a deprecation
+# warning, under Apple's own API_DEPRECATED "obsoleted" mechanism) on the
+# macOS 26 SDK this CI runner's default Xcode bundles. JUCE's own code
+# already has the fix for this (a ScreenCaptureKit-based path, gated
+# behind JUCE_MAC_API_VERSION_MIN_REQUIRED_AT_LEAST(14,4), which checks
+# CMAKE_OSX_DEPLOYMENT_TARGET) -- it just never routes there because that
+# variable is left unset for juceaide's own sub-build. Setting it here,
+# before JUCE's own CMakeLists.txt runs, is the actually-intended fix
+# (not a patch to JUCE's source): confirmed by reading the real failing
+# source and its own #if condition, not guessed.
+set(CMAKE_OSX_DEPLOYMENT_TARGET "14.4" CACHE STRING "" FORCE)
+
 include(FetchContent)
 FetchContent_Declare(
    JUCE
