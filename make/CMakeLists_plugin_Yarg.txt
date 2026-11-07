@@ -67,7 +67,18 @@ set(YARG_PLUGIN_SOURCES
 # before JUCE's own CMakeLists.txt runs, is the actually-intended fix
 # (not a patch to JUCE's source): confirmed by reading the real failing
 # source and its own #if condition, not guessed.
-set(CMAKE_OSX_DEPLOYMENT_TARGET "14.4" CACHE STRING "" FORCE)
+set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0" CACHE STRING "" FORCE)
+# Belt and suspenders: the CACHE var alone didn't fix this on the first
+# real attempt (same error, unchanged, on the next CI run) -- root cause
+# unconfirmed (juceaide's own re-invoked `cmake` sub-build, via
+# execute_process in its CMakeLists.txt, only forwards
+# CMAKE_OSX_DEPLOYMENT_TARGET if the variable is already truthy at that
+# point; something about -DPLATFORM=ios's own toolchain setup may be
+# clearing or shadowing it before then). The environment variable is
+# read directly by clang/CMake's own AppleClang support independently
+# of any CMake-variable-propagation subtlety, and env vars always reach
+# a child execute_process regardless -- sidesteps the question entirely.
+set(ENV{MACOSX_DEPLOYMENT_TARGET} "15.0")
 
 include(FetchContent)
 FetchContent_Declare(
