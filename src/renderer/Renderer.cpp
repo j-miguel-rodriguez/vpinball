@@ -3410,6 +3410,25 @@ void Renderer::RenderUIScene()
    }
 }
 
+// YARG + VPX integration: every patch below (ClearEmbeddedAncillaryWindow
+// skip, ball-redraw-over-the-highway) applies globally to ANY table using
+// ScoreView/Backglass -- deliberately so, not a bug: the project's own
+// goal is for these features to be usable with any table the user wants
+// to pair with YARG gameplay, not hardcoded to one demo table. A stock
+// table using ScoreView/Backglass for a normal opaque scoreboard/DMD
+// would still get the same see-through-background and ball-drawn-on-top
+// treatment if this is left on, which is why it's a real, user-visible
+// toggle rather than always-on: g_yargModeEnabled, defined here, set by
+// YargVpxPlugin.cpp's own "YargModeEnabled" setting (extern, not a
+// plugin-API message, since that's the simplest link between a statically
+// linked plugin and this fork's own renderer internals -- consistent with
+// this being a documented "last resort" exception already). Defaults to
+// true: every table tested against this fork so far has been this
+// project's own, so flipping the default would silently change existing
+// behavior; the setting still lets it be turned off per table, or on for
+// a new one.
+bool g_yargModeEnabled = true;
+
 void Renderer::Render3DScene()
 {
    ResizeRenderTargets();
@@ -3525,7 +3544,12 @@ void Renderer::Render3DScene()
    // this window too, and needs the same see-through treatment the
    // highway needed on ScoreView. Define
    // YARG_DISABLE_BACKGLASS_CLEAR_SKIP to fully revert this one window
-   // to stock (opaque) behavior without affecting ScoreView.
+   // to stock (opaque) behavior without affecting ScoreView. Scoped to
+   // g_yargModeEnabled (see its own comment above Render3DScene()) so
+   // loading any OTHER table's own, normal use of an embedded Backglass
+   // still gets the stock opaque clear it actually wants.
+   if (!g_yargModeEnabled)
+      ClearEmbeddedAncillaryWindow(VPXWindowId::VPXWINDOW_Backglass, g_pplayer->m_backglassOutput, renderedRT);
 #else
    ClearEmbeddedAncillaryWindow(VPXWindowId::VPXWINDOW_Backglass, g_pplayer->m_backglassOutput, renderedRT);
 #endif
@@ -3552,6 +3576,9 @@ void Renderer::Render3DScene()
    // observed as a visible problem in testing, but if it ever becomes
    // one, define YARG_DISABLE_SCOREVIEW_CLEAR_SKIP to fully revert to
    // stock behavior (opaque ScoreView again) with no other code changes.
+   // Scoped to g_yargModeEnabled -- see Backglass's own comment above.
+   if (!g_yargModeEnabled)
+      ClearEmbeddedAncillaryWindow(VPXWindowId::VPXWINDOW_ScoreView, g_pplayer->m_scoreViewOutput, renderedRT);
 #else
    ClearEmbeddedAncillaryWindow(VPXWindowId::VPXWINDOW_ScoreView, g_pplayer->m_scoreViewOutput, renderedRT);
 #endif
@@ -3575,10 +3602,15 @@ void Renderer::Render3DScene()
    // below, now also applied to Backglass -- see that block for the full
    // explanation (opaque/transparent command bucketing, fixed by forcing
    // a new render pass). Define YARG_DISABLE_BACKGLASS_BALL_OVERLAY to
-   // revert just this window.
-   m_renderDevice->SetRenderTarget("YargBallOverlay"s, renderedRT, true, true);
-   for (Ball* const ball : g_pplayer->m_vball)
-      ball->Render(Renderer::DEFAULT);
+   // revert just this window. Scoped to g_yargModeEnabled -- any other
+   // table's normal use of Backglass wants the ball staying hidden
+   // behind it, same as stock VPX.
+   if (g_yargModeEnabled)
+   {
+      m_renderDevice->SetRenderTarget("YargBallOverlay"s, renderedRT, true, true);
+      for (Ball* const ball : g_pplayer->m_vball)
+         ball->Render(Renderer::DEFAULT);
+   }
 #endif
    RenderAncillaryWindow(VPXWindowId::VPXWINDOW_ScoreView, g_pplayer->m_scoreViewOutput, renderedRT, g_pplayer->m_ancillaryWndRenderers[VPXWindowId::VPXWINDOW_ScoreView]);
 #ifndef YARG_DISABLE_SCOREVIEW_BALL_OVERLAY
@@ -3618,10 +3650,14 @@ void Renderer::Render3DScene()
    // ball mesh only rasterizes the pixels it actually covers, so an
    // unclipped new pass is still a no-op everywhere outside the
    // highway -- this also means, unlike the first attempt, there's no
-   // dependency on Backglass/Topper staying unused.
-   m_renderDevice->SetRenderTarget("YargBallOverlay"s, renderedRT, true, true);
-   for (Ball* const ball : g_pplayer->m_vball)
-      ball->Render(Renderer::DEFAULT);
+   // dependency on Backglass/Topper staying unused. Scoped to
+   // g_yargModeEnabled -- same reasoning as Backglass's own block above.
+   if (g_yargModeEnabled)
+   {
+      m_renderDevice->SetRenderTarget("YargBallOverlay"s, renderedRT, true, true);
+      for (Ball* const ball : g_pplayer->m_vball)
+         ball->Render(Renderer::DEFAULT);
+   }
 #endif
    RenderAncillaryWindow(VPXWindowId::VPXWINDOW_Topper, g_pplayer->m_topperOutput, renderedRT, g_pplayer->m_ancillaryWndRenderers[VPXWindowId::VPXWINDOW_Topper]);
 
