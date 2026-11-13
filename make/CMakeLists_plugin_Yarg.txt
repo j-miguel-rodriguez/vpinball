@@ -180,6 +180,24 @@ if(BUILD_STATIC)
       JUCE_WEB_BROWSER=0
       JUCE_USE_CURL=0
       JUCE_DISPLAY_SPLASH_SCREEN=0
+      # Root cause of the Minimoog AU never loading (confirmed by reading
+      # JUCE's own source, not guessed): AudioPluginFormatManager::
+      # createPluginInstanceAsync (juce_AudioPluginFormat.cpp) does nothing
+      # but MessageManager::postMessage() an AsyncCreateMessage -- actual
+      # instantiation only happens when something drains JUCE's message
+      # queue and delivers it to AudioPluginFormat::handleMessage(). A real
+      # JUCEApplication does that automatically; this project deliberately
+      # has none (see this file's own top comment), and nothing else here
+      # ever pumps JUCE's queue either. Worse, JUCE_MODAL_LOOPS_PERMITTED
+      # defaults to 0 on every platform (juce_PlatformDefs.h), which
+      # compiles MessageManager::runDispatchLoopUntil() out entirely --
+      # the one API that could pump it ourselves. Defining it here makes
+      # that API exist again; AUv3Host::pump() (AUv3Host.cpp) calls it
+      # every frame to actually drain the queue. This is why isResolved()
+      # never flipped true in either real on-device log capture (83s and
+      # ~14s of play, zero progress both times) -- not a timing issue, the
+      # queued instantiation message had no way to ever run at all.
+      JUCE_MODAL_LOOPS_PERMITTED=1
    )
 
    # JUCE module linkage: juce_audio_processors (AudioPluginFormatManager/
