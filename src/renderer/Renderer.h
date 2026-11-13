@@ -152,6 +152,14 @@ public:
    // Area drawn by the window's renderer on the last frame, normalized to the output (left, top, right, bottom), empty (right <= left) if none
    const vec4& GetAncillaryContentBounds(VPXWindowId window) const { return m_ancillaryContentBounds[window]; }
    void ResetAncillaryContentBounds(VPXWindowId window) { m_ancillaryContentBounds[window] = vec4(0.f, 0.f, 0.f, 0.f); }
+   // YARG + VPX integration: where the window's content actually sits on
+   // screen for an OM_EMBEDDED output (left, top, right, bottom, normalized
+   // to the container window), empty (right <= left) if not currently
+   // embedded/rendered. Unlike GetAncillaryContentBounds above (the area the
+   // CONTENT fills within its own canvas), this is the canvas's own
+   // placement on screen -- what InputManager::PushTouchEvent needs to tell
+   // whether a touch landed on this window at all, and where within it.
+   const vec4& GetAncillaryWindowScreenRect(VPXWindowId window) const { return m_ancillaryWindowScreenRect[window]; }
 
    // 'unmirror' flips the display content back in mirror mode so that it stays readable. Only for displays that are scene objects of their
    // own (e.g. flashers): ancillary renderer content is flipped as a whole (see Flasher::Render) and backdrop displays are not mirrored
@@ -338,6 +346,7 @@ private:
    uint32_t m_ancillaryWndShowTime[VPXWindowId::VPXWINDOW_Topper + 1] = {}; // msec() of the last lazy show (a demotion is only repaired shortly after it)
    int m_ancillaryWndRotation [VPXWindowId::VPXWINDOW_Topper + 1] = {}; // Live rotation of the window content, in clockwise degrees
    vec4 m_ancillaryContentBounds[VPXWindowId::VPXWINDOW_Topper + 1] = {}; // See GetAncillaryContentBounds
+   vec4 m_ancillaryWindowScreenRect[VPXWindowId::VPXWINDOW_Topper + 1] = {}; // See GetAncillaryWindowScreenRect
    struct AncillaryRenderSetup
    {
       bool isOutputLinear;

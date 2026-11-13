@@ -4306,6 +4306,13 @@ void Renderer::RenderAncillaryWindow(VPXWindowId window, const VPX::RenderOutput
          static_cast<float>(m_outputX + m_outputW) / static_cast<float>(outputRT->GetWidth()),
          static_cast<float>(m_outputY + m_outputH) / static_cast<float>(outputRT->GetHeight())));
 
+      // YARG + VPX integration: same rect, kept per-window (not just appended
+      // to m_embeddedRegions, whose order/contents depend on which other
+      // windows rendered this frame) so InputManager::PushTouchEvent can look
+      // up exactly this window's own placement by id, on demand, regardless
+      // of frame timing relative to touch events.
+      m_ancillaryWindowScreenRect[window] = m_embeddedRegions.back();
+
       // Keep the embedded ancillary content ordered after bloom: it writes the buffer that bloom
       // already sampled with this region cleared, so without this dependency the sorter may run it
       // before the bloom sample and bloom bleeds the content into the region. No-op without bloom

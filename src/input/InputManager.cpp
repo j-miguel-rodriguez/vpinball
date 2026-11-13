@@ -10,6 +10,7 @@
 #include "input/PlungerHandler.h"
 #include "math/bbox.h"
 #include "physics/cabinet/NudgeHandler.h"
+#include "renderer/Renderer.h"
 #include "renderer/VRDevice.h"
 #include "ui/live/LiveUI.h"
 
@@ -639,6 +640,17 @@ void InputManager::PushAxisEvent(uint16_t deviceId, uint16_t axisId, uint64_t ti
    }
 }
 
+// YARG + VPX integration: optional hook for the Yarg plugin's on-screen
+// PartyKeys touch-test overlay. A plain function-pointer slot, not an
+// unconditional extern call into plugin code, so this file (part of
+// vpx-core, built standalone with no Yarg plugin linked in by this fork's
+// own upstream CI jobs) always links cleanly -- only the Yarg plugin
+// itself (iOS, statically/directly linked into the same binary) ever sets
+// this, in its own YargPluginLoad/YargPluginUnload. User's own ask: let
+// the iPhone's own touch screen press PartyKeys overlay keys directly,
+// for testing without the real MIDI hardware.
+void (*g_partyKeyTouchCallback)(float localX, float localY, bool isPressed) = nullptr;
+
 void InputManager::PushTouchEvent(float relativeX, float relativeY, uint64_t timestampNs, bool isPressed)
 {
    // Discard input events until the player has been running for a few frames to avoid triggering actions during table startup
@@ -648,6 +660,26 @@ void InputManager::PushTouchEvent(float relativeX, float relativeY, uint64_t tim
 
    if (m_player->IsVR())
       return;
+
+   // YARG + VPX integration: forward a touch landing inside the PartyKeys
+   // overlay's own embedded window (VPXWINDOW_Backglass) to the Yarg
+   // plugin, converted to coordinates local to that window (0..1) -- the
+   // same space RenderPartyKeysOverlay's own key layout already uses, so
+   // the plugin can hit-test its own key rects directly without knowing
+   // anything about embedding/screen placement itself. Falls through to
+   // the existing region-based handling below either way: both systems
+   // can coexist, since PartyKeys isn't one of the fixed touch regions.
+   if (g_partyKeyTouchCallback != nullptr && m_player->m_renderer)
+   {
+      const vec4& bgRect = m_player->m_renderer->GetAncillaryWindowScreenRect(VPXWindowId::VPXWINDOW_Backglass);
+      if (bgRect.z > bgRect.x && bgRect.w > bgRect.y && relativeX >= bgRect.x && relativeX <= bgRect.z && relativeY >= bgRect.y
+         && relativeY <= bgRect.w)
+      {
+         const float localX = (relativeX - bgRect.x) / (bgRect.z - bgRect.x);
+         const float localY = (relativeY - bgRect.y) / (bgRect.w - bgRect.y);
+         g_partyKeyTouchCallback(localX, localY, isPressed);
+      }
+   }
 
    POINT point;
    point.x = (int)((float)m_player->m_playfieldWnd->GetWidth() * relativeX);
