@@ -3538,13 +3538,13 @@ void Renderer::Render3DScene()
 
    // Clear embedded ancillary windows before updarting bloom & AO
 #ifndef YARG_DISABLE_BACKGLASS_CLEAR_SKIP
-   // YARG + VPX integration: same fix as YARG_DISABLE_SCOREVIEW_CLEAR_SKIP
+   // YARG + VPX integration: same fix as YARG_DISABLE_TOPPER_CLEAR_SKIP
    // below, now also applied to Backglass -- this project's second
    // overlay (the PartyKeys controller mirror, YargVpxPlugin.cpp) uses
    // this window too, and needs the same see-through treatment the
-   // highway needed on ScoreView. Define
+   // highway needs on its own window (Topper since 2026-11-23). Define
    // YARG_DISABLE_BACKGLASS_CLEAR_SKIP to fully revert this one window
-   // to stock (opaque) behavior without affecting ScoreView. Scoped to
+   // to stock (opaque) behavior without affecting Topper. Scoped to
    // g_yargModeEnabled (see its own comment above Render3DScene()) so
    // loading any OTHER table's own, normal use of an embedded Backglass
    // still gets the stock opaque clear it actually wants.
@@ -3553,36 +3553,21 @@ void Renderer::Render3DScene()
 #else
    ClearEmbeddedAncillaryWindow(VPXWindowId::VPXWINDOW_Backglass, g_pplayer->m_backglassOutput, renderedRT);
 #endif
-#ifndef YARG_DISABLE_SCOREVIEW_CLEAR_SKIP
-   // YARG + VPX integration: this is the REAL fix for the ball
-   // disappearing under the highway -- ClearEmbeddedAncillaryWindow()
-   // unconditionally paints a fully OPAQUE black quad
-   // (DrawEmbeddedQuad(..., 0.f, 0.f, 0.f), alpha hardcoded to 1.f in
-   // the shader call) over the ENTIRE ScoreView rectangle before any
-   // ancillary content (our highway) gets drawn into it -- confirmed
-   // on-device: the ball/playfield only ever showed through the part
-   // of its sprite that extended PAST the rectangle's edges, never
-   // through the highway's own (correctly alpha-blended)
-   // HighwayOpacity setting, no matter its value, because by the time
-   // our own draw runs the ball underneath is already erased. VPX's
-   // ancillary-window mechanism assumes a solid scoreboard/DMD panel,
-   // not a see-through overlay over live 3D content -- this project's
-   // own highway wants the latter, so skip the clear for ScoreView
-   // specifically (Topper, which nothing here uses, is left untouched).
-   // The ONLY known cost: ClearEmbeddedAncillaryWindow's own comment
-   // notes it also clears depth "to avoid AO artefacts" in that region
-   // -- skipping it could in theory leave stale depth values from the
-   // 3D scene affecting AO/bloom right at the highway's edges; not
-   // observed as a visible problem in testing, but if it ever becomes
-   // one, define YARG_DISABLE_SCOREVIEW_CLEAR_SKIP to fully revert to
-   // stock behavior (opaque ScoreView again) with no other code changes.
-   // Scoped to g_yargModeEnabled -- see Backglass's own comment above.
-   if (!g_yargModeEnabled)
-      ClearEmbeddedAncillaryWindow(VPXWindowId::VPXWINDOW_ScoreView, g_pplayer->m_scoreViewOutput, renderedRT);
-#else
+   // YARG + VPX integration (2026-11-23): the highway moved from ScoreView to Topper. ScoreView is where
+   // real ROM tables show their DMD (PinMAME's renderer outranked the highway there on Attack from Mars), so
+   // it is back to stock behavior. Topper, which almost no table uses, now gets the see-through treatment
+   // ScoreView used to have -- full history in docs/STATUS.md of j-miguel-rodriguez/vpx-yarg: VPX's opaque
+   // ClearEmbeddedAncillaryWindow() erased the ball/playfield under the highway, so it is skipped for the
+   // highway's window. Define YARG_DISABLE_TOPPER_CLEAR_SKIP to restore the stock opaque Topper. Only known
+   // cost: the clear also resets depth "to avoid AO artefacts" in that region (not observed as a visible
+   // problem). Scoped to g_yargModeEnabled -- see Backglass's own comment above.
    ClearEmbeddedAncillaryWindow(VPXWindowId::VPXWINDOW_ScoreView, g_pplayer->m_scoreViewOutput, renderedRT);
-#endif
+#ifndef YARG_DISABLE_TOPPER_CLEAR_SKIP
+   if (!g_yargModeEnabled)
+      ClearEmbeddedAncillaryWindow(VPXWindowId::VPXWINDOW_Topper, g_pplayer->m_topperOutput, renderedRT);
+#else
    ClearEmbeddedAncillaryWindow(VPXWindowId::VPXWINDOW_Topper, g_pplayer->m_topperOutput, renderedRT);
+#endif
 
    // Compute AO contribution (to be applied later, with tonemapping)
    if (GetAOMode() == 2) // Only process for dynamic AO
@@ -3598,7 +3583,7 @@ void Renderer::Render3DScene()
    m_embeddedRegions.clear();
    RenderAncillaryWindow(VPXWindowId::VPXWINDOW_Backglass, g_pplayer->m_backglassOutput, renderedRT, g_pplayer->m_ancillaryWndRenderers[VPXWindowId::VPXWINDOW_Backglass]);
 #ifndef YARG_DISABLE_BACKGLASS_BALL_OVERLAY
-   // YARG + VPX integration: same fix as YARG_DISABLE_SCOREVIEW_BALL_OVERLAY
+   // YARG + VPX integration: same fix as YARG_DISABLE_TOPPER_BALL_OVERLAY
    // below, now also applied to Backglass -- see that block for the full
    // explanation (opaque/transparent command bucketing, fixed by forcing
    // a new render pass). Define YARG_DISABLE_BACKGLASS_BALL_OVERLAY to
@@ -3613,45 +3598,16 @@ void Renderer::Render3DScene()
    }
 #endif
    RenderAncillaryWindow(VPXWindowId::VPXWINDOW_ScoreView, g_pplayer->m_scoreViewOutput, renderedRT, g_pplayer->m_ancillaryWndRenderers[VPXWindowId::VPXWINDOW_ScoreView]);
-#ifndef YARG_DISABLE_SCOREVIEW_BALL_OVERLAY
-   // YARG + VPX integration: ScoreView's own content (our highway) is
-   // composited in by the call just above, AFTER the whole 3D scene
-   // (ball included) was already rendered for this frame -- so without
-   // this, the highway always visually sits on top of the ball, which
-   // is why YARG_DISABLE_SCOREVIEW_CLEAR_SKIP above exists (opacity is
-   // the only lever otherwise). Re-rendering the ball(s) here instead
-   // makes the ball sit on top of the highway, wherever it actually
-   // belongs: Ball::Render() depth-tests by default, and the depth
-   // buffer from the main pass is left untouched (ScoreView's clear,
-   // which also cleared depth, is skipped), so each ball only passes
-   // where it's really positioned -- a ball mesh only rasterizes the
-   // handful of screen pixels it actually projects to, so this is a
-   // harmless no-op redraw everywhere else on the table, not real
-   // overdraw.
-   //
-   // A first attempt appended this straight into ScoreView's own
-   // render pass (no SetRenderTarget call in between) and confirmed
-   // on-device: the ball rendered BEHIND the highway's own content
-   // anyway. Cause: Ball::Render()'s mesh draw uses DrawMesh(...,
-   // isTranparentPass=false, ...) (opaque), while the highway's own
-   // content (DrawImage -> DrawTexturedQuad(..., true, ...)) is
-   // explicitly transparent -- a render pass buckets opaque and
-   // transparent commands separately and runs the opaque bucket
-   // first, REGARDLESS of submission order, so our ball draws kept
-   // getting hoisted to run before the highway's transparent draws no
-   // matter where in the pass they were appended.
-   //
-   // Fixed by forcing a brand new pass here (forceNewPass=true):
-   // pass-level dependency ordering (SetRenderTarget's own
-   // AddPrecursor(renderedRT->m_lastRenderPass), not intra-pass
-   // opaque/transparent bucketing, governs ordering between passes,
-   // so this is guaranteed to run only once ScoreView's entire pass
-   // (highway content included) has completed. No scissor needed: a
-   // ball mesh only rasterizes the pixels it actually covers, so an
-   // unclipped new pass is still a no-op everywhere outside the
-   // highway -- this also means, unlike the first attempt, there's no
-   // dependency on Backglass/Topper staying unused. Scoped to
-   // g_yargModeEnabled -- same reasoning as Backglass's own block above.
+   RenderAncillaryWindow(VPXWindowId::VPXWINDOW_Topper, g_pplayer->m_topperOutput, renderedRT, g_pplayer->m_ancillaryWndRenderers[VPXWindowId::VPXWINDOW_Topper]);
+#ifndef YARG_DISABLE_TOPPER_BALL_OVERLAY
+   // YARG + VPX integration: re-render the ball(s) after the highway (now in Topper) is composited, so the ball
+   // sits on top of the highway where it really is instead of hidden under it. Moved here from ScoreView
+   // (2026-11-23) along with the highway. Why it needs its own pass: Ball::Render() draws opaque, the highway
+   // draws transparent, and a render pass runs its opaque bucket first whatever the submission order, so
+   // appending into Topper's pass put the ball behind the highway again (seen on-device with ScoreView).
+   // forceNewPass=true orders it after Topper's whole pass. Depth from the main pass is intact (Topper's
+   // clear, which also clears depth, is skipped), so each ball only draws where it is really visible -- a
+   // no-op everywhere else. Define YARG_DISABLE_TOPPER_BALL_OVERLAY to revert. Scoped to g_yargModeEnabled.
    if (g_yargModeEnabled)
    {
       m_renderDevice->SetRenderTarget("YargBallOverlay"s, renderedRT, true, true);
@@ -3659,7 +3615,6 @@ void Renderer::Render3DScene()
          ball->Render(Renderer::DEFAULT);
    }
 #endif
-   RenderAncillaryWindow(VPXWindowId::VPXWINDOW_Topper, g_pplayer->m_topperOutput, renderedRT, g_pplayer->m_ancillaryWndRenderers[VPXWindowId::VPXWINDOW_Topper]);
 
    const bool hasAntialiasPass = m_FXAA != Disabled;
    const bool hasSharpenPass = m_sharpen != 0;
