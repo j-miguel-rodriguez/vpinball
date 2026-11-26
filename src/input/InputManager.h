@@ -238,6 +238,7 @@ private:
    ankerl::unordered_dense::map<uint32_t, vector<ButtonMapping*>> m_buttonMappings;
    vector<InputAction*> m_onUpdateActions;
    const unsigned int m_onActionEventMsgId;
+   const unsigned int m_onFlipperScriptKeyMsgId; // YARG integration, VPXPI_EVT_ON_FLIPPER_SCRIPT_KEY
 
    ankerl::unordered_dense::map<uint32_t, vector<SensorMapping*>> m_sensorMappings;
    vector<std::function<void()>> m_axisListeners;

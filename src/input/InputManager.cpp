@@ -31,6 +31,7 @@ InputManager::InputManager(Player* player, Settings& appSettings)
    : m_player(player)
    , m_appSettings(appSettings)
    , m_onActionEventMsgId(m_player->m_pluginAPI.GetMsgID(VPXPI_NAMESPACE, VPXPI_EVT_ON_ACTION_CHANGED))
+   , m_onFlipperScriptKeyMsgId(m_player->m_pluginAPI.GetMsgID(VPXPI_NAMESPACE, VPXPI_EVT_ON_FLIPPER_SCRIPT_KEY))
    , m_keyboardDeviceId(RegisterDevice("Key"s, InputManager::DeviceType::Keyboard, "Keyboards"s)) // Base device: merge inputs from all connected keyboards
    , m_mouseDeviceId(RegisterDevice("Mouse"s, InputManager::DeviceType::Mouse, "Mouse"s)) // Base device: merge inputs from all connected mice
 {
@@ -141,6 +142,7 @@ InputManager::~InputManager()
    m_plungerHandler = nullptr;
    m_sdlHandler = nullptr;
    m_player->m_pluginAPI.ReleaseMsgID(m_onActionEventMsgId);
+   m_player->m_pluginAPI.ReleaseMsgID(m_onFlipperScriptKeyMsgId);
 
    #ifdef _WIN32
       if (m_hKeyboardHook)
@@ -756,7 +758,12 @@ void InputManager::CreateInputActions()
 
             CComVariant rgvar[1] = { CComVariant(0x10000 | static_cast<int>(action.GetActionId())) };
             DISPPARAMS dispparams = { rgvar, nullptr, 1, 0 };
+            // YARG integration: bracket the script's flipper key handling (VPXPI_EVT_ON_FLIPPER_SCRIPT_KEY).
+            VPXFlipperScriptKeyEvent scriptKeyEvent { static_cast<int>(action.GetActionId()), 1 };
+            m_player->m_pluginAPI.BroadcastVPXMsg(m_onFlipperScriptKeyMsgId, &scriptKeyEvent);
             m_player->m_ptable->FireDispID(isPressed ? DISPID_GameEvents_KeyDown : DISPID_GameEvents_KeyUp, &dispparams);
+            scriptKeyEvent.isInside = 0;
+            m_player->m_pluginAPI.BroadcastVPXMsg(m_onFlipperScriptKeyMsgId, &scriptKeyEvent);
          }));
       return newAction->GetActionId();
    };

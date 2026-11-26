@@ -42,6 +42,16 @@
 // script Hit event (triggers, targets, kickers, bumpers, walls/rubbers with hit events on), except flippers.
 // Event data is a VPXPartHitEvent, valid only for the duration of the call. Sent on the main/script thread.
 #define VPXPI_EVT_ON_PART_HIT           "OnPartHit:1"
+// YARG + VPX integration: broadcast right before (isInside = 1) and right after (isInside = 0) VPX runs the table
+// script's KeyDown/KeyUp for a flipper button. Script calls in between run synchronously with nothing else (no
+// physics), so anything the script does inside -- e.g. a ROM table flipping its flipper switch through
+// Controller.Switch -- is the flipper button's doing. Event data is a VPXFlipperScriptKeyEvent.
+#define VPXPI_EVT_ON_FLIPPER_SCRIPT_KEY "OnFlipperScriptKey:1"
+typedef struct VPXFlipperScriptKeyEvent
+{
+   int action;   // VPXAction of the flipper button
+   int isInside; // 1 = script key handling starts, 0 = it has finished
+} VPXFlipperScriptKeyEvent;
 typedef struct VPXPartHitEvent
 {
    const char* name; // the part's script name (UTF-8)
