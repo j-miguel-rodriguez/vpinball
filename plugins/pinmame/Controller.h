@@ -179,6 +179,7 @@ private:
    bool m_hidden = true; // Show/Hide PinMAME window
 
    const MsgPluginAPI* const m_msgApi;
+   unsigned int m_onSwitchChangedMsgId = 0; // CTLPI_SWITCH_ON_CHG_MSG (YARG integration, see ControllerPlugin.h)
    const unsigned int m_endpointId;
 
    enum DeviceMode

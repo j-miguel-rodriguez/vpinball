@@ -50,6 +50,7 @@ Controller::Controller(const MsgPluginAPI* api, unsigned int endpointId, const P
    m_getDmdSrcMsgId = m_msgApi->GetMsgID(CTLPI_NAMESPACE, CTLPI_DISPLAY_GET_SRC_MSG);
    m_onDmdChangedMsgId = m_msgApi->GetMsgID(CTLPI_NAMESPACE, CTLPI_DISPLAY_ON_SRC_CHG_MSG);
    m_msgApi->SubscribeMsg(m_endpointId, m_onDmdChangedMsgId, OnDmdSrcChanged, this);
+   m_onSwitchChangedMsgId = m_msgApi->GetMsgID(CTLPI_NAMESPACE, CTLPI_SWITCH_ON_CHG_MSG);
 
    m_stateSources.Subscribe();
 }
@@ -64,6 +65,7 @@ Controller::~Controller()
 
    m_msgApi->UnsubscribeMsg(m_onDmdChangedMsgId, OnDmdSrcChanged, this);
    m_msgApi->ReleaseMsgID(m_onDmdChangedMsgId);
+   m_msgApi->ReleaseMsgID(m_onSwitchChangedMsgId);
    m_msgApi->ReleaseMsgID(m_getDmdSrcMsgId);
 
    if (m_onDestroyHandler)
@@ -567,11 +569,13 @@ void Controller::SetSwitch(int switchNo, bool state)
    if (switchNoOfs < 0)
       return;
 
+   bool changed = false;
    m_stateSources.With(
-      [this, &switchNoOfs, &state](const std::vector<StateSrcId>& states)
+      [this, &switchNoOfs, &state, &changed](const std::vector<StateSrcId>& states)
       {
          if (m_switchStates.size() < switchNoOfs + 1)
             m_switchStates.resize(switchNoOfs + 1, false);
+         changed = m_switchStates[switchNoOfs] != state;
          m_switchStates[switchNoOfs] = state;
 
          if (switchNoOfs < m_switchMap.size())
@@ -581,6 +585,13 @@ void Controller::SetSwitch(int switchNo, bool state)
                m_switches.stateDefs[index].SetState(m_switches.stateDefs[index].callContext, &bv);
             }
       });
+
+   // YARG integration: announce real changes only (scripts often re-write a switch with its current value).
+   if (changed)
+   {
+      SwitchChangedMsg msg { switchNo, state ? 1 : 0 };
+      m_msgApi->BroadcastMsg(m_endpointId, m_onSwitchChangedMsgId, &msg);
+   }
 }
 
 int Controller::GetDip(int nDipBank) const

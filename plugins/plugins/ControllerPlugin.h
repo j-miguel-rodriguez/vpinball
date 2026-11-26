@@ -129,6 +129,17 @@ typedef struct RunCmdMsg
 
 #define CTLPI_STATE_TYPE_CUSTOM               0 // Custom game state, precise definition must be provided by the controller
 #define CTLPI_STATE_TYPE_SWITCH               1 // Binary switch state: 0 for opened, non 0 for closed
+
+// YARG + VPX integration (j-miguel-rodriguez/vpx-yarg, 2026-11-25): broadcast by a controller each time one of
+// its switches actually changes state (PinMAME: a table script's Controller.Switch(n) = v). Lets a plugin react
+// to every switch on any ROM table without polling. Message data is a pointer to a SwitchChangedMsg, valid only
+// for the duration of the call. Sent on the thread that changed the switch (the script / main thread).
+#define CTLPI_SWITCH_ON_CHG_MSG       "OnSwitchChanged:1"
+typedef struct SwitchChangedMsg
+{
+   int switchNo; // switch number as the table script uses it
+   int state;    // 0 = opened, 1 = closed
+} SwitchChangedMsg;
 #define CTLPI_STATE_TYPE_RELATIVE_BRIGHTNESS  2 // Relative linear brightness: linear perceived luminance normalized to the positive data range of the data format (0..1, 0..255,...)
 
 typedef struct StateDef
