@@ -38,6 +38,15 @@
 #define VPXPI_EVT_ON_PREPARE_FRAME      "OnPrepareFrame:1"      // Broadcasted when player starts preparing a new frame
 #define VPXPI_EVT_ON_UPDATE_PHYSICS     "OnUpdatePhysics:1"     // Broadcasted when player update physics (happens often, so must be used with care)
 #define VPXPI_EVT_ON_ACTION_CHANGED     "OnActionChanged:1"     // Broadcasted when an action state change, event data is an VPXActionEvent whose isPressed field can be modified by plugins
+// YARG + VPX integration (j-miguel-rodriguez/vpx-yarg, 2026-11-25): broadcast every time a table part fires its
+// script Hit event (triggers, targets, kickers, bumpers, walls/rubbers with hit events on), except flippers.
+// Event data is a VPXPartHitEvent, valid only for the duration of the call. Sent on the main/script thread.
+#define VPXPI_EVT_ON_PART_HIT           "OnPartHit:1"
+typedef struct VPXPartHitEvent
+{
+   const char* name; // the part's script name (UTF-8)
+   int itemType;     // ItemTypeEnum value (VPX core ieditable.h)
+} VPXPartHitEvent;
 
 // Ancillary window rendering
 #define VPXPI_MSG_GET_AUX_RENDERER      "GetAuxRenderer:1"      // Broadcasted with a GetAncillaryRendererMsg to discover ancillary window renderer implemented in plugins

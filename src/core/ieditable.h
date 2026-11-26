@@ -46,6 +46,10 @@ class HitTimer;
 class PhysicsEngine;
 class PinTable;
 
+class IEditable;
+// YARG + VPX integration: tells plugins a part fired its Hit event (VPXPI_EVT_ON_PART_HIT), see VPXPluginAPIImpl.cpp.
+void YargNotifyPartHit(IEditable* item, int itemType);
+
 class IFireEvents
 {
 public:
@@ -104,7 +108,7 @@ public:
 	STDMETHOD(put_UserValue)(VARIANT *newVal) {return IEditable::put_UserValue(newVal);} \
 	IScriptable *GetIScriptable() final {return (IScriptable *)this;} \
 	const IScriptable *GetIScriptable() const final {return (const IScriptable *)this;} \
-	void FireGroupEvent(const int dispid) final {FireVoidGroupEvent(dispid);}
+	void FireGroupEvent(const int dispid) final { if (dispid == DISPID_HitEvents_Hit) YargNotifyPartHit(this, itemType); FireVoidGroupEvent(dispid); }
 
 // used above, do not invoke directly
 #define _STANDARD_DISPATCH_INDEPENDENT_EDITABLE_DECLARES(T, ItemType) \

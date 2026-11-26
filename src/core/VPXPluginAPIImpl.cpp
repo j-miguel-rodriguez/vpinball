@@ -779,3 +779,16 @@ void VPXPluginAPIImpl::OnGetLoggingPluginAPI(const unsigned int msgId, void* use
    LoggingPluginAPI** pResult = static_cast<LoggingPluginAPI**>(msgData);
    *pResult = &pi.m_loggingApi;
 }
+
+// YARG + VPX integration (j-miguel-rodriguez/vpx-yarg, 2026-11-25): called from every part's FireGroupEvent
+// (ieditable.h) for DISPID_HitEvents_Hit, so plugins can react to hits on any table, ROM or not. Flippers are
+// skipped: they are driven by the player's own buttons, not the ball reaching a switch.
+void YargNotifyPartHit(IEditable* item, int itemType)
+{
+   if (g_pplayer == nullptr || item == nullptr || itemType == eItemFlipper)
+      return;
+   const unsigned int msgId = g_pplayer->m_pluginAPI.GetMsgID(VPXPI_NAMESPACE, VPXPI_EVT_ON_PART_HIT);
+   VPXPartHitEvent event { item->GetName().c_str(), itemType };
+   g_pplayer->m_pluginAPI.BroadcastVPXMsg(msgId, &event);
+   g_pplayer->m_pluginAPI.ReleaseMsgID(msgId);
+}
