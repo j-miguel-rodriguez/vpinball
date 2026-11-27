@@ -3,6 +3,10 @@
 #include "core/stdafx.h"
 #include "flasher.h"
 
+// YARG + VPX integration: defined in Renderer.cpp, set by YargVpxPlugin.cpp
+extern bool g_yargModeEnabled;
+extern int g_yargPlayfieldMonotone; // 0 = original, 1 = gray, 2 = black
+
 #include "core/VPApp.h"
 #include "core/VPXPluginAPIImpl.h"
 #include "math/matrix.h"
@@ -1004,6 +1008,12 @@ void Flasher::Render(const unsigned int renderMask)
 
    // Don't render if LightSequence in play and state is off
    if (m_lockedByLS && !m_inPlayState)
+      return;
+
+   // YARG "Playfield Color" gray/black (see Primitive::Render): baked playfield light layers drawn as flashers with
+   // "PLAYFIELD_..." images (e.g. Attack from Mars' PLAYFIELD_GI_mid / PLAYFIELD_Flasher_top) are hidden.
+   if (g_yargModeEnabled && g_yargPlayfieldMonotone != 0 && !isUIPass
+      && (StrFindNoCase(m_d.m_szImageA, "playfield"s) != string::npos || StrFindNoCase(m_d.m_szImageB, "playfield"s) != string::npos))
       return;
 
    // Update lightmap before checking anything that uses alpha

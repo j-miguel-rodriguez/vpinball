@@ -910,6 +910,14 @@ void Primitive::Render(const unsigned int renderMask)
       pinf = SamplerFilter::SF_ANISOTROPIC;
    }
 
+   // YARG "Playfield Color" (see the material override below): besides the real playfield, many modern tables
+   // (e.g. VPW's Attack from Mars) draw the playfield from baked layers -- primitives whose image is named
+   // "PLAYFIELD_..." -- with additive light layers on top. Base layers get the flat color; additive light layers
+   // are skipped so they don't paint the artwork back on.
+   const bool yargPlayfieldLike = m_useAsPlayfield || StrFindNoCase(m_d.m_szImage, "playfield"s) != string::npos;
+   if (yargPlayfieldLike && g_yargModeEnabled && g_yargPlayfieldMonotone != 0 && m_d.m_addBlend && !isUIPass)
+      return;
+
    // Do not render ourself inside our reflection probe (no self reflection)
    RenderProbe * const reflection_probe = (isUIPass || m_d.m_reflectionStrength <= 0) ? nullptr : m_ptable->GetRenderProbe(m_d.m_szReflectionProbe);
    if (reflection_probe != nullptr && reflection_probe->IsRendering())
@@ -991,7 +999,7 @@ void Primitive::Render(const unsigned int renderMask)
    // table's image/material from script, which depends on per-table names (and the static prepass caches the
    // playfield anyway), so it did nothing on Attack from Mars. Instead the playfield primitive is drawn here
    // untextured in flat gray/black. g_yargPlayfieldMonotone (Renderer.cpp) is set by YargVpxPlugin.cpp.
-   const bool yargMonoPlayfield = m_useAsPlayfield && g_yargModeEnabled && g_yargPlayfieldMonotone != 0;
+   const bool yargMonoPlayfield = yargPlayfieldLike && g_yargModeEnabled && g_yargPlayfieldMonotone != 0 && !isUIPass;
    static Material s_yargMonoMaterial;
    if (yargMonoPlayfield)
    {
