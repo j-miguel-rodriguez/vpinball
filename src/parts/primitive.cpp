@@ -3,6 +3,10 @@
 #include "core/stdafx.h" 
 #include "primitive.h"
 
+// YARG + VPX integration: defined in Renderer.cpp, set by YargVpxPlugin.cpp
+extern bool g_yargModeEnabled;
+extern int g_yargPlayfieldMonotone; // 0 = original, 1 = gray, 2 = black
+
 #include "core/VPApp.h"
 #include "math/matrix.h"
 #include "parts/light.h"
@@ -982,7 +986,20 @@ void Primitive::Render(const unsigned int renderMask)
    RenderProbe *const refraction_probe = m_ptable->GetRenderProbe(m_d.m_szRefractionProbe);
    RenderTarget *const refractions = refraction_probe ? refraction_probe->Render(renderMask) : nullptr;
 
-   const Material *const mat = m_ptable->GetMaterial(m_d.m_szMaterial);
+   const Material *mat = m_ptable->GetMaterial(m_d.m_szMaterial);
+   // YARG + VPX integration (2026-11-26): "Playfield Color" Gray/Black for ANY table. The plugin used to change the
+   // table's image/material from script, which depends on per-table names (and the static prepass caches the
+   // playfield anyway), so it did nothing on Attack from Mars. Instead the playfield primitive is drawn here
+   // untextured in flat gray/black. g_yargPlayfieldMonotone (Renderer.cpp) is set by YargVpxPlugin.cpp.
+   const bool yargMonoPlayfield = m_useAsPlayfield && g_yargModeEnabled && g_yargPlayfieldMonotone != 0;
+   static Material s_yargMonoMaterial;
+   if (yargMonoPlayfield)
+   {
+      s_yargMonoMaterial = *mat;
+      s_yargMonoMaterial.m_cBase = g_yargPlayfieldMonotone == 1 ? 0x3C3C3C : 0x0A0A0A;
+      s_yargMonoMaterial.m_cGlossy = 0;
+      mat = &s_yargMonoMaterial;
+   }
 
    const bool depthMask = m_d.m_useDepthMask && !m_d.m_addBlend;
 
@@ -994,8 +1011,8 @@ void Primitive::Render(const unsigned int renderMask)
    m_renderer->m_renderDevice->m_basicShader->SetVector(ShaderUniform::fDisableLighting_top_below, m_d.m_disableLightingTop, m_d.m_staticRendering ? 1.0f : m_d.m_disableLightingBelow, 0.f, 0.f);
 
    // Select textures, replacing backglass image by capture if it is available
-   Texture * const nMap = m_ptable->GetImage(m_d.m_szNormalMap);
-   Texture * const img = m_ptable->GetImage(m_d.m_szImage);
+   Texture * const nMap = yargMonoPlayfield ? nullptr : m_ptable->GetImage(m_d.m_szNormalMap);
+   Texture * const img = yargMonoPlayfield ? nullptr : m_ptable->GetImage(m_d.m_szImage);
    const float pinAlphaTest = img != nullptr ? img->m_alphaTestValue : -1.f;
    m_renderer->m_renderDevice->m_basicShader->SetAlphaTestValue(pinAlphaTest);
 

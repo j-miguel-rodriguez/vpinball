@@ -3428,9 +3428,19 @@ void Renderer::RenderUIScene()
 // behavior; the setting still lets it be turned off per table, or on for
 // a new one.
 bool g_yargModeEnabled = true;
+// YARG "Playfield Color" for any table: 0 = original, 1 = gray, 2 = black (Primitive::Render, playfield only).
+// Set by YargVpxPlugin.cpp (extern, same reasoning as g_yargModeEnabled above).
+int g_yargPlayfieldMonotone = 0;
 
 void Renderer::Render3DScene()
 {
+   // The playfield is usually drawn into the cached static prepass, so a Playfield Color change must re-render it.
+   static int s_yargLastPlayfieldMonotone = 0;
+   if (const int mono = g_yargModeEnabled ? g_yargPlayfieldMonotone : 0; mono != s_yargLastPlayfieldMonotone)
+   {
+      s_yargLastPlayfieldMonotone = mono;
+      m_isStaticPrepassDirty = true;
+   }
    ResizeRenderTargets();
 
    // Keep previous render as a reflection probe for ball reflection and for hires motion blur
